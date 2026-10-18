@@ -3,6 +3,7 @@ import { ChevronLeft, ChevronRight, MoonStar } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { Button } from '@/components/ui/Button';
 import { inputCls } from '@/components/ui/inputClass';
+import { Skeleton } from '@/components/ui/Skeleton';
 import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { dayjs, hhmm, ISO } from '@/lib/date';
@@ -71,13 +72,26 @@ export default function Schedule() {
     enabled: canPick,
   });
 
+  // Data dianggap siap hanya bila kedua query sukses untuk bulan yang sedang dilihat
+  // (bukan data bulan/karyawan sebelumnya yang dipinjam oleh keepPreviousData).
+  const failed = roster.isError || holidays.isError;
+  const dataReady =
+    roster.isSuccess && holidays.isSuccess && !roster.isPlaceholderData && !holidays.isPlaceholderData;
+  const pending = !dataReady && !failed;
+
   const targetName =
     targetId === user?.employeeId
       ? user?.nama
       : (employees.data?.data ?? []).find((e) => e.id === targetId)?.nama ?? '';
 
-  const rosterByDate = useMemo(() => new Map((roster.data?.data ?? []).map((r) => [r.shiftDate, r])), [roster.data]);
-  const holidayByDate = useMemo(() => new Map((holidays.data?.data ?? []).map((h) => [h.tanggal, h])), [holidays.data]);
+  const rosterByDate = useMemo(
+    () => new Map((dataReady ? (roster.data?.data ?? []) : []).map((r) => [r.shiftDate, r])),
+    [dataReady, roster.data],
+  );
+  const holidayByDate = useMemo(
+    () => new Map((dataReady ? (holidays.data?.data ?? []) : []).map((h) => [h.tanggal, h])),
+    [dataReady, holidays.data],
+  );
 
   // Sel kalender, Senin sebagai hari pertama.
   const cells = useMemo(() => {
@@ -105,12 +119,10 @@ export default function Schedule() {
   }, [cells, rosterByDate, holidayByDate]);
 
   const today = dayjs().format(ISO);
-  const hasData = (roster.data?.data ?? []).length > 0;
+  const hasData = dataReady && (roster.data?.data ?? []).length > 0;
   const selRoster = rosterByDate.get(selected);
   const selHoliday = holidayByDate.get(selected);
   const selPrev = rosterByDate.get(dayjs(selected).subtract(1, 'day').format(ISO));
-  const loading = roster.isLoading || holidays.isLoading;
-  const failed = roster.isError || holidays.isError;
 
   function go(delta: number) {
     const next = month.add(delta, 'month');
@@ -191,13 +203,13 @@ export default function Schedule() {
       )}
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        <Stat label="Hari kerja" value={stats.kerja} />
-        <Stat label="Shift malam" value={stats.malam} color="var(--violet)" />
-        <Stat label="Libur nasional" value={stats.liburNasional} color="var(--danger)" />
-        <Stat label="Libur rotasi" value={stats.libur} />
+        <Stat label="Hari kerja" value={dataReady ? stats.kerja : null} pending={pending} />
+        <Stat label="Shift malam" value={dataReady ? stats.malam : null} pending={pending} color="var(--violet)" />
+        <Stat label="Libur nasional" value={dataReady ? stats.liburNasional : null} pending={pending} color="var(--danger)" />
+        <Stat label="Libur rotasi" value={dataReady ? stats.libur : null} pending={pending} />
       </div>
 
-      <section aria-label="Kalender jadwal" className={`card p-2 sm:p-4 ${loading ? 'animate-pulse' : ''}`}>
+      <section aria-label="Kalender jadwal" aria-busy={pending} className={`card p-2 sm:p-4 ${pending ? 'animate-pulse' : ''}`}>
         <div className="mb-1 grid grid-cols-7 gap-1 text-center text-caption text-muted">
           {WEEKDAYS.map((d) => (
             <div key={d}>{d}</div>
@@ -212,13 +224,14 @@ export default function Schedule() {
             const st = r ? styleOf(r.shiftNama) : null;
             const isSel = date === selected;
             const isToday = date === today;
+            const dayLabel = dayjs(date).format('dddd D MMMM');
             return (
               <button
                 key={date}
                 type="button"
                 onClick={() => setSelected(date)}
                 aria-pressed={isSel}
-                aria-label={`${dayjs(date).format('dddd D MMMM')}: ${h ? h.nama : r ? r.shiftNama : 'libur'}`}
+                aria-label={dataReady ? `${dayLabel}: ${h ? h.nama : r ? r.shiftNama : 'libur'}` : dayLabel}
                 className={`flex min-h-[56px] flex-col items-stretch gap-0.5 rounded-sm border p-1 text-left transition-colors md:min-h-[92px] md:p-2 ${
                   isSel ? 'border-primary-500 ring-2 ring-primary-200' : 'border-transparent hover:border-border'
                 } ${h ? 'bg-[var(--danger-bg)]' : 'bg-surface-2'}`}
@@ -251,7 +264,9 @@ export default function Schedule() {
                   <span className="hidden text-[11px] text-muted md:block">↳ s/d {hhmm(prev.jamSelesai)}</span>
                 )}
                 {h && <span className="hidden truncate text-[11px] font-semibold text-danger md:block">{h.nama}</span>}
-                {!r && !h && !(prev?.lintasHari) && <span className="hidden text-[11px] text-faint md:block">Libur</span>}
+                {dataReady && !r && !h && !prev?.lintasHari && (
+                  <span className="hidden text-[11px] text-faint md:block">Libur</span>
+                )}
               </button>
             );
           })}
@@ -272,56 +287,85 @@ export default function Schedule() {
         </ul>
       </section>
 
-      {!loading && !failed && !hasData && (
+      {dataReady && !hasData && (
         <p className="card text-muted">Belum ada jadwal untuk bulan ini. Seed hanya mengisi 12 bulan terakhir sampai 30 hari ke depan.</p>
       )}
 
-      <section aria-label="Detail hari" className="card flex flex-col gap-2">
+      <section aria-label="Detail hari" aria-busy={pending} className="card flex flex-col gap-2">
         <h3 className="capitalize">{dayjs(selected).format('dddd, D MMMM YYYY')}</h3>
-        {selHoliday && (
-          <p className="font-semibold text-danger">Libur nasional: {selHoliday.nama}</p>
-        )}
-        {selRoster ? (
+        {!dataReady ? (
+          pending ? (
+            <div className="flex flex-col gap-2">
+              <Skeleton className="h-6 w-40" />
+              <Skeleton className="h-4 w-56" />
+            </div>
+          ) : (
+            <p className="text-muted">–</p>
+          )
+        ) : (
           <>
-            <p className="flex flex-wrap items-center gap-2">
-              <span
-                className="rounded-sm px-2 py-0.5 font-bold"
-                style={{ background: styleOf(selRoster.shiftNama).bg, color: styleOf(selRoster.shiftNama).color }}
-              >
-                {selRoster.shiftNama}
-              </span>
-              <span className="tabular font-mono">
-                {hhmm(selRoster.jamMulai)} - {hhmm(selRoster.jamSelesai)}
-              </span>
-            </p>
-            {selRoster.lintasHari && (
+            {selHoliday && <p className="font-semibold text-danger">Libur nasional: {selHoliday.nama}</p>}
+            {selRoster ? (
+              <>
+                <p className="flex flex-wrap items-center gap-2">
+                  <span
+                    className="rounded-sm px-2 py-0.5 font-bold"
+                    style={{ background: styleOf(selRoster.shiftNama).bg, color: styleOf(selRoster.shiftNama).color }}
+                  >
+                    {selRoster.shiftNama}
+                  </span>
+                  <span className="tabular font-mono">
+                    {hhmm(selRoster.jamMulai)} - {hhmm(selRoster.jamSelesai)}
+                  </span>
+                </p>
+                {selRoster.lintasHari && (
+                  <p className="flex items-center gap-1.5 text-muted">
+                    <MoonStar size={16} aria-hidden /> Shift malam: selesai besok pukul {hhmm(selRoster.jamSelesai)}.
+                  </p>
+                )}
+                <p className="text-muted">Lokasi: {selRoster.locationNama}</p>
+                {selHoliday && (
+                  <p className="text-caption text-muted">
+                    Ada roster di hari libur nasional; hari ini tidak dihitung sebagai hari kerja.
+                  </p>
+                )}
+              </>
+            ) : (
+              <p className="text-muted">{selHoliday ? 'Tidak ada roster.' : 'Libur sesuai rotasi, tidak ada shift.'}</p>
+            )}
+            {!selRoster && selPrev?.lintasHari && (
               <p className="flex items-center gap-1.5 text-muted">
-                <MoonStar size={16} aria-hidden /> Shift malam: selesai besok pukul {hhmm(selRoster.jamSelesai)}.
+                <MoonStar size={16} aria-hidden /> Lanjutan shift malam kemarin, selesai pukul {hhmm(selPrev.jamSelesai)}.
               </p>
             )}
-            <p className="text-muted">Lokasi: {selRoster.locationNama}</p>
-            {selHoliday && <p className="text-caption text-muted">Ada roster di hari libur nasional; hari ini tidak dihitung sebagai hari kerja.</p>}
           </>
-        ) : (
-          <p className="text-muted">{selHoliday ? 'Tidak ada roster.' : 'Libur sesuai rotasi, tidak ada shift.'}</p>
-        )}
-        {!selRoster && selPrev?.lintasHari && (
-          <p className="flex items-center gap-1.5 text-muted">
-            <MoonStar size={16} aria-hidden /> Lanjutan shift malam kemarin, selesai pukul {hhmm(selPrev.jamSelesai)}.
-          </p>
         )}
       </section>
     </div>
   );
 }
 
-function Stat({ label, value, color }: { label: string; value: number; color?: string }) {
+function Stat({
+  label,
+  value,
+  pending,
+  color,
+}: {
+  label: string;
+  value: number | null;
+  pending: boolean;
+  color?: string;
+}) {
   return (
     <div className="card flex flex-col gap-1 p-4">
       <span className="text-caption text-muted">{label}</span>
-      <span className="tabular text-h2" style={color ? { color } : undefined}>
-        {value}
-      </span>
+      {pending ? (
+        <Skeleton className="h-8 w-12" />
+      ) : (
+        <span className="tabular text-h2" style={color ? { color } : undefined}>
+          {value ?? '–'}
+        </span>
+      )}
     </div>
   );
 }
