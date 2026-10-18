@@ -9,3 +9,8 @@ build/
 Thumbs.db
 coverage/
 attendance-latest.zip
+
+CLAUDE.md
+setup.bat
+setup.sh
+.vscode/
