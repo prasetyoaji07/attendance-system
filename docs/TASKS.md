@@ -13,7 +13,7 @@ Centang saat selesai. Urutan penting: fase berikutnya bergantung pada fase sebel
 ## Fase 1: Fondasi (master data, shift, roster, engine status)
 - [x] `database/migrations/001_init.sql`: semua tabel master + `rosters`, `attendance`, `audit_logs` (lihat alur.md bagian 5)
 - [x] `utils/shift-time.ts`: `buildShiftWindow`, `pickActiveRoster`, `calcLateMinutes` (TDD, termasuk shift malam)
-- [ ] Modul `auth`: login JWT, hash password, `GET /auth/me`
+- [x] Modul `auth`: login JWT, hash password, `GET /auth/me` (device binding menyusul di Fase 2)
 - [ ] Modul `employees`, `locations`, `shifts` (CRUD + validasi zod + RBAC)
 - [ ] Modul `roster`: generate dari `shift_patterns`, validasi jeda >= 11 jam
 - [ ] Fungsi status harian (pure) + test aturan bisnis 1-4

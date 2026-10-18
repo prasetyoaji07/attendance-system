@@ -1,9 +1,11 @@
 import { Router } from 'express';
+import { requireAuth } from '../../core/middleware/auth';
+import { validate } from '../../core/middleware/validate';
+import { login, me } from './auth.controller';
+import { loginSchema } from './auth.schema';
 
 export const authRoutes = Router();
 
-// FASE 1: login JWT, device binding
-// Pola file di modul ini: auth.routes.ts -> auth.controller.ts -> auth.service.ts -> auth.repository.ts
-// Logika bisnis HANYA di service. Controller tipis. Validasi input pakai zod (core/middleware/validate).
-
-authRoutes.get('/_ping', (_req, res) => res.json({ module: 'auth', status: 'stub' }));
+// Device binding (daftar, pending, approval ganti device) dikerjakan di Fase 2.
+authRoutes.post('/login', validate(loginSchema), login);
+authRoutes.get('/me', requireAuth, me);
