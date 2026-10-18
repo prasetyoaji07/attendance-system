@@ -7,12 +7,12 @@ Centang saat selesai. Urutan penting: fase berikutnya bergantung pada fase sebel
 - [x] Token desain + Button 3D + halaman uji (Home)
 - [x] `haversine.ts` dan `hmac-qr.ts` + unit test
 - [x] Migration runner (`npm run migrate`)
-- [ ] Isi `server/.env` dan pastikan `/api/health` menunjukkan `db: ok`
+- [x] Isi `server/.env` dan pastikan `/api/health` menunjukkan `db: ok`
 - [ ] Commit pertama (docs + scaffold)
 
 ## Fase 1: Fondasi (master data, shift, roster, engine status)
-- [ ] `database/migrations/001_init.sql`: semua tabel master + `rosters`, `attendance`, `audit_logs` (lihat alur.md bagian 5)
-- [ ] `utils/shift-time.ts`: `buildShiftWindow`, `pickActiveRoster`, `calcLateMinutes` (TDD, termasuk shift malam)
+- [x] `database/migrations/001_init.sql`: semua tabel master + `rosters`, `attendance`, `audit_logs` (lihat alur.md bagian 5)
+- [x] `utils/shift-time.ts`: `buildShiftWindow`, `pickActiveRoster`, `calcLateMinutes` (TDD, termasuk shift malam)
 - [ ] Modul `auth`: login JWT, hash password, `GET /auth/me`
 - [ ] Modul `employees`, `locations`, `shifts` (CRUD + validasi zod + RBAC)
 - [ ] Modul `roster`: generate dari `shift_patterns`, validasi jeda >= 11 jam
