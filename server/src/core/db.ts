@@ -11,6 +11,11 @@ export const pool = mysql.createPool({
   waitForConnections: true,
   connectionLimit: 10,
   timezone: 'Z', // simpan UTC, tampilkan WIB di lapisan presentasi
+  // Koneksi ke TiDB Cloud kadang diputus saat menganggur (error "read ECONNRESET" di log).
+  // Keep-alive menjaga koneksi tetap hidup; connectTimeout mencegah koneksi baru yang macet menggantung.
+  enableKeepAlive: true,
+  keepAliveInitialDelay: 10_000,
+  connectTimeout: 10_000,
 });
 
 /** Jalankan beberapa query dalam satu transaksi. Rollback otomatis jika error. */
