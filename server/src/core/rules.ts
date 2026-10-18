@@ -12,6 +12,7 @@ export const RULES = {
   checkinWindowHoursBefore: 2,
   checkinWindowHoursAfter: 2,
   minRestHoursBetweenShifts: 11,
+  maxRosterRangeDays: 62,
   maxOvertimeHoursPerDay: 4,
   annualLeaveQuotaDays: 12,
   payrollCutoffStartDay: 21,

@@ -1,9 +1,14 @@
 import { Router } from 'express';
+import { requireAuth } from '../../core/middleware/auth';
+import { requireRole } from '../../core/middleware/rbac';
+import { validate } from '../../core/middleware/validate';
+import { createPattern, generate, list, listPatterns } from './roster.controller';
+import { createPatternSchema, generateRosterSchema, listRosterQuerySchema } from './roster.schema';
 
 export const rosterRoutes = Router();
 
-// FASE 1: generate jadwal, tukar shift, validasi jeda
-// Pola file di modul ini: roster.routes.ts -> roster.controller.ts -> roster.service.ts -> roster.repository.ts
-// Logika bisnis HANYA di service. Controller tipis. Validasi input pakai zod (core/middleware/validate).
-
-rosterRoutes.get('/_ping', (_req, res) => res.json({ module: 'roster', status: 'stub' }));
+rosterRoutes.use(requireAuth);
+rosterRoutes.get('/', validate(listRosterQuerySchema, 'query'), list);
+rosterRoutes.get('/patterns', listPatterns);
+rosterRoutes.post('/patterns', requireRole('HRD', 'ADMIN'), validate(createPatternSchema), createPattern);
+rosterRoutes.post('/generate', requireRole('SPV', 'HRD', 'ADMIN'), validate(generateRosterSchema), generate);

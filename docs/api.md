@@ -46,3 +46,21 @@ Respons error berbentuk `{ "error": { "code", "message", "details?" } }`.
 
 Aturan: hanya ADMIN yang boleh membuat/mengubah/menonaktifkan akun ADMIN. Role sendiri tidak bisa diubah, dan tidak bisa menonaktifkan diri sendiri.
 Rantai atasan tidak boleh melingkar. Semua perubahan master tercatat di `audit_logs`.
+
+## Roster
+| Method | Path | Akses | Keterangan |
+|---|---|---|---|
+| GET | `/roster/patterns` | login | daftar pola rotasi `{ id, nama, urutan: string[] }` |
+| POST | `/roster/patterns` | HRD, ADMIN | `{ nama, urutan }`. Isi `urutan` = nama shift (tidak peka huruf besar/kecil) atau `"libur"`. Nama shift harus sudah ada (400), pola tidak boleh libur semua (400), nama kembar 409 |
+| GET | `/roster` | login | query wajib `from`, `to` (`YYYY-MM-DD`, maks 62 hari), opsional `employeeId`. EMPLOYEE selalu hanya melihat jadwalnya sendiri |
+| POST | `/roster/generate` | SPV, HRD, ADMIN | lihat di bawah |
+
+`POST /roster/generate` body: `{ patternId, locationId, from, to, employees: [{ employeeId, offset? }], anchorDate?, dryRun? }`
+- `anchorDate` = tanggal yang dianggap awal pola (default `from`). `offset` menggeser posisi pola per karyawan supaya tim tidak semuanya di shift yang sama.
+- Hari `"libur"` di pola tidak membuat baris roster (tidak ada roster = tidak wajib hadir).
+- Tanggal yang sudah punya roster **dilewati** dan dilaporkan di `skipped`, tidak ditimpa.
+- Jeda antar shift berurutan harus >= 11 jam (`RULES.minRestHoursBetweenShifts`), termasuk terhadap roster yang sudah ada sehari sebelum dan sesudah rentang. Jika ada yang kurang, **seluruh proses dibatalkan** (tidak ada yang tersimpan): `409` kode `REST_VIOLATION`, `details` berisi `[{ employeeId, previousDate, nextDate, restHours, minRestHours }]`. Pelanggaran yang sudah ada di DB sebelumnya tidak ikut diblokir.
+- `dryRun: true`: hanya menghitung dan memvalidasi, tidak menyimpan (200). Tanpa dryRun: 201.
+- Respons: `{ data: { dryRun, from, to, created, skipped: [{ employeeId, shiftDate }] } }`. Tercatat di `audit_logs` (`ROSTER_GENERATE`).
+- Batas: rentang maks 62 hari, maks 200 karyawan per proses. Karyawan harus aktif.
+- Catatan: SPV saat ini bisa membuat jadwal untuk karyawan mana pun (pembatasan per divisi menyusul).

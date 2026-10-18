@@ -126,6 +126,8 @@ attendance-system/
 | `overtime_records` | id, request_id, jam_disetujui, jam_aktual, jam_dibayar, pengali |
 | `attendance_corrections` | id, attendance_id, nilai_lama, nilai_baru, alasan, status |
 
+**Catatan roster:** `"libur"` di `shift_patterns.urutan` adalah nama khusus (tidak peka huruf besar/kecil) dan **tidak membuat baris** di `rosters`. Nama lain dicocokkan ke `shifts.nama` (juga tidak peka huruf besar/kecil). Generate roster membatalkan seluruh proses bila ada jeda antar shift < 11 jam (aturan bisnis 4).
+
 ### 5.3 Sistem
 
 `workflow_templates`, `workflow_steps` (template_id, urutan, role_approver, sla_jam), `periods` (start, end, status OPEN/LOCKED), `risk_flags`, `audit_logs`, `notifications`.

@@ -15,7 +15,7 @@ Centang saat selesai. Urutan penting: fase berikutnya bergantung pada fase sebel
 - [x] `utils/shift-time.ts`: `buildShiftWindow`, `pickActiveRoster`, `calcLateMinutes` (TDD, termasuk shift malam)
 - [x] Modul `auth`: login JWT, hash password, `GET /auth/me` (device binding menyusul di Fase 2)
 - [x] Modul `employees`, `locations`, `shifts` (CRUD + validasi zod + RBAC; karyawan dinonaktifkan, bukan dihapus; termasuk divisi)
-- [ ] Modul `roster`: generate dari `shift_patterns`, validasi jeda >= 11 jam
+- [x] Modul `roster`: generate dari `shift_patterns`, validasi jeda >= 11 jam (+ pola shift, daftar jadwal; tukar shift menyusul di Fase 3)
 - [ ] Fungsi status harian (pure) + test aturan bisnis 1-4
 - [ ] `scripts/seed.ts`: ~50 karyawan, 3 bulan roster (label "data simulasi")
 - [ ] Client: login, AppShell (sidebar desktop + bottom nav mobile), halaman Jadwal
