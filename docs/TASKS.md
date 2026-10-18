@@ -24,7 +24,8 @@ Centang saat selesai. Urutan penting: fase berikutnya bergantung pada fase sebel
 - [x] Endpoint `POST /attendance/check-in` sesuai flow alur.md 7.1
 - [x] Check-out + auto-close (`POST /attendance/check-out`, `jobs/auto-close.ts`; cron 15 menit: kode ada, tick nyata di server belum terbukti)
 - [x] Endpoint QR dinamis per lokasi: `GET /locations/:id/qr` (HRD/ADMIN). Halaman layar yang menampilkannya menyusul bersama item client
-- [ ] Device binding (daftar, pending, approval ganti device)
+- [x] Device binding (daftar, pending, approval ganti device): `/devices/*` + guard header `X-Device-Id` di check-in/check-out (migrasi 003). Terbukti lewat HTTP + TiDB asli (`scripts/try-devices.ts`, 30 pemeriksaan). Belum dicoba: check-in sungguhan dengan header perangkat pada shift aktif, dan pengecekan baris `audit_logs` aksi `DEVICE_*`
+- [ ] Client: daftar perangkat setelah login (UUID acak di localStorage, kirim header `X-Device-Id`) + halaman antrean persetujuan perangkat untuk HRD/ADMIN
 - [ ] Client: komponen `AttendanceButton` (tombol Absen 3D, 4 state) + chip jarak/akurasi
 - [ ] Client: scan QR (kamera) + Geolocation API
 - [ ] Beranda Karyawan (referensi visual halaman lain)

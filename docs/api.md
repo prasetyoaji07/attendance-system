@@ -73,19 +73,61 @@ Rantai atasan tidak boleh melingkar. Semua perubahan master tercatat di `audit_l
 - Batas: rentang maks 62 hari, maks 200 karyawan per proses. Karyawan harus aktif.
 - Catatan: SPV saat ini bisa membuat jadwal untuk karyawan mana pun (pembatasan per divisi menyusul).
 
+## Devices (Fase 2)
+
+Device binding: akun dipakai dari perangkat yang sudah disetujui. `deviceId` adalah ID acak yang dibuat dan disimpan klien (UUID dari `crypto.randomUUID()` lolos). Aplikasi web tidak bisa membaca ID perangkat keras, jadi ganti browser atau hapus data situs dianggap perangkat baru. Ini pencegah pinjam-akun, **bukan pengaman penuh**.
+
+| Method | Path | Akses | Keterangan |
+|---|---|---|---|
+| POST | `/devices/register` | login | body `{ deviceId }`. Klien memanggilnya setelah login. Aman diulang |
+| GET | `/devices/me` | login | status perangkat yang sedang dipakai (dari header `X-Device-Id`) |
+| GET | `/devices/pending` | HRD, ADMIN | antrean permintaan perangkat baru |
+| POST | `/devices/:id/approve` | HRD, ADMIN | setujui permintaan |
+| POST | `/devices/:id/reject` | HRD, ADMIN | tolak permintaan |
+
+`POST /devices/register` -> `{ data: { status: 'active' | 'pending', created, message } }`
+- `201` jika baris baru dibuat, `200` jika perangkat itu sudah terdaftar (status tidak berubah).
+- `deviceId`: 16-64 karakter huruf, angka, `_`, atau `-`. Selain itu `400 VALIDATION_ERROR`.
+- Perangkat pertama sebuah akun langsung `active`. Perangkat berikutnya `pending` (menunggu HRD/ADMIN). Paling banyak satu `pending` per akun: permintaan baru menggantikan yang lama.
+
+`GET /devices/me` -> `{ data: { current: 'active' | 'pending' | 'unregistered', devices: [{ id, status, current }] } }`. Hanya perangkat milik akun sendiri, dan `deviceId` sungguhan tidak dikembalikan.
+
+`GET /devices/pending` -> `{ data: [{ id, userId, nik, nama, departmentNama, requestedAt (ISO UTC) }] }`, terlama di atas.
+
+`POST /devices/:id/approve` -> `{ data: { id, userId, replacedDevices } }`
+- Perangkat jadi `active` dan semua perangkat lain milik akun itu dihapus (satu `active` per akun). `replacedDevices` = jumlah yang dihapus.
+- `404` jika id tidak ada. `409` jika perangkat itu sudah `active`.
+- HRD tidak boleh menyetujui perangkatnya sendiri (`403`). ADMIN boleh, supaya satu-satunya HRD yang ganti HP tidak terkunci.
+
+`POST /devices/:id/reject` -> `{ data: { id } }`. Baris `pending` dihapus; perangkat `active` akun itu tidak tersentuh. `404` / `409` seperti approve.
+
+Semua perubahan tercatat di `audit_logs` (aksi `DEVICE_REGISTER`, `DEVICE_REQUEST`, `DEVICE_CHANGE`, `DEVICE_REJECT`).
+
+**Guard.** `POST /attendance/check-in` dan `POST /attendance/check-out` wajib mengirim header `X-Device-Id` berisi perangkat `active` milik akun. Pemeriksaan ini berjalan setelah JWT dan sebelum validasi body:
+
+| Status | Kode | Arti |
+|---|---|---|
+| 403 | `DEVICE_REQUIRED` | header tidak ada atau formatnya tidak valid |
+| 403 | `DEVICE_NOT_REGISTERED` | perangkat belum terdaftar untuk akun ini (login ulang lalu `register`) |
+| 403 | `DEVICE_PENDING` | perangkat masih menunggu persetujuan HRD |
+
+Skrip uji: `npx tsx scripts/try-devices.ts` (dari folder `server`; tidak membuat absen).
+
 ## Attendance (Fase 2)
 
 | Method | Path | Akses | Keterangan |
 |---|---|---|---|
-| POST | `/attendance/check-in` | login | check-in untuk roster yang jendelanya sedang terbuka |
-| POST | `/attendance/check-out` | login | check-out untuk absen terakhir yang masih terbuka |
+| POST | `/attendance/check-in` | login + perangkat `active` | check-in untuk roster yang jendelanya sedang terbuka |
+| POST | `/attendance/check-out` | login + perangkat `active` | check-out untuk absen terakhir yang masih terbuka |
+
+Keduanya wajib header `X-Device-Id` (lihat bagian Devices untuk kode 403).
 
 ### Check-in
 
 `POST /attendance/check-in` body: `{ lat, lng, accuracyM, qr }`
 - `lat`, `lng`: koordinat dari Geolocation API (lat -90..90, lng -180..180). `accuracyM`: akurasi GPS dalam meter. `qr`: token hasil scan layar lokasi.
 - **Roster aktif**: dicari dari roster dengan tanggal mulai shift kemarin, hari ini, dan besok. Dipilih yang jendelanya `[mulai - 2 jam, selesai + 2 jam]` memuat waktu sekarang. Jika dua jendela tumpang tindih, dipilih yang jam mulainya paling dekat. Dengan begini shift malam yang melewati tengah malam tetap benar. "Besok" ditambahkan agar shift yang mulai sehabis tengah malam bisa check-in malam sebelumnya.
-- Urutan pemeriksaan: roster aktif, sudah check-in, akurasi GPS, jarak (Haversine), QR, lalu hitung telat dan simpan. Check-in pertama yang gagal menghentikan proses.
+- Urutan pemeriksaan: JWT, perangkat, roster aktif, sudah check-in, akurasi GPS, jarak (Haversine), QR, lalu hitung telat dan simpan. Pemeriksaan pertama yang gagal menghentikan proses.
 - `late_minutes = max(0, sekarang - (jam_mulai + toleransi))`. Status `TELAT` jika lebih dari 0, selain itu `HADIR` (fungsi yang sama dengan `computeDailyStatus`).
 - Sukses: `201` `{ data: { attendanceId, rosterId, shiftDate, shiftNama, locationNama, checkInAt (ISO UTC), status, lateMinutes, distanceM, message } }`. Contoh `message`: `Check-in 07:12, terlambat 7 menit`.
 
@@ -94,6 +136,7 @@ Rantai atasan tidak boleh melingkar. Semua perubahan master tercatat di `audit_l
 | 400 | `VALIDATION_ERROR` | body tidak sesuai skema |
 | 400 | `INVALID_QR` | QR rusak, tanda tangan salah, kedaluwarsa, atau untuk lokasi lain |
 | 401 | `UNAUTHORIZED` | belum login atau token tidak valid |
+| 403 | `DEVICE_REQUIRED`, `DEVICE_NOT_REGISTERED`, `DEVICE_PENDING` | guard perangkat (lihat bagian Devices) |
 | 409 | `CONFLICT` | roster ini sudah punya check-in (aturan bisnis 3). Penjaga kedua: `UNIQUE(roster_id)` |
 | 422 | `NO_ACTIVE_ROSTER` | tidak ada roster yang jendelanya terbuka sekarang |
 | 422 | `GPS_ACCURACY_LOW` | akurasi lebih besar dari `RULES.maxGpsAccuracyM` (50 m). `details`: `{ accuracyM, maxAccuracyM }` |
@@ -104,7 +147,7 @@ Rantai atasan tidak boleh melingkar. Semua perubahan master tercatat di `audit_l
 `POST /attendance/check-out` body: `{ lat, lng, accuracyM, qr }` (sama dengan check-in)
 - **Absen yang dicari** adalah ABSEN TERAKHIR karyawan (`check_in_at` terbaru), bukan lewat jendela roster. Dengan begini shift malam yang lewat tengah malam tetap menempel ke roster tanggal mulainya.
 - **Batas akhir check-out** = jam selesai shift + `RULES.checkinWindowHoursAfter` (2 jam). Tepat di batas masih boleh (inklusif).
-- Urutan pemeriksaan: absen terakhir, sudah check-out, batas waktu, akurasi GPS, jarak, QR, hitung, lalu simpan. Pemeriksaan GPS, jarak, dan QR sama dengan check-in.
+- Urutan pemeriksaan: JWT, perangkat, absen terakhir, sudah check-out, batas waktu, akurasi GPS, jarak, QR, hitung, lalu simpan. Pemeriksaan GPS, jarak, dan QR sama dengan check-in.
 - Status dari `computeDailyStatus`: `TELAT` > `PULANG_CEPAT` > `HADIR`. Pulang cepat = check-out sebelum jam selesai - toleransi shift. `lateMinutes` dan `earlyLeaveMinutes` dilaporkan terpisah. Jarak dan akurasi saat check-out tidak disimpan.
 - Sukses: `200` `{ data: { attendanceId, rosterId, shiftDate, shiftNama, locationNama, checkInAt (ISO UTC), checkOutAt (ISO UTC), status, lateMinutes, earlyLeaveMinutes, workedMinutes, distanceM, message } }`. Contoh `message`: `Check-out 13:40, pulang 15 menit lebih awal`, atau `Check-out 14:02` jika tidak pulang cepat.
 - UPDATE hanya mengenai baris yang masih terbuka (`check_out_at` kosong dan belum auto-close). Dua request bersamaan, atau auto-close yang menyalip, berakhir `409`.
@@ -114,6 +157,7 @@ Rantai atasan tidak boleh melingkar. Semua perubahan master tercatat di `audit_l
 | 400 | `VALIDATION_ERROR` | body tidak sesuai skema |
 | 400 | `INVALID_QR` | sama dengan check-in |
 | 401 | `UNAUTHORIZED` | belum login atau token tidak valid |
+| 403 | `DEVICE_REQUIRED`, `DEVICE_NOT_REGISTERED`, `DEVICE_PENDING` | guard perangkat (lihat bagian Devices) |
 | 409 | `CONFLICT` | absen ini sudah check-out (selama masih dalam batas waktu), atau keburu ditutup di antara dua request |
 | 422 | `NO_OPEN_ATTENDANCE` | belum pernah check-in, atau absen terakhir sudah check-out dan batas waktunya lewat |
 | 422 | `CHECKOUT_WINDOW_CLOSED` | batas waktu check-out lewat, atau absen sudah ditutup otomatis. Pesan: ajukan koreksi absen ke HRD |
@@ -129,4 +173,4 @@ Absen yang punya check-in tetapi `check_out_at` kosong dan sudah lewat batas akh
 - Dijadwalkan setiap 15 menit lewat node-cron, hanya jika `RUN_JOBS=true` di `server/.env` (default `false`).
 - Alat uji lokal: `npx tsx scripts/try-autoclose.ts` (dari folder `server`) hanya melihat absen yang akan ditutup. Tambahkan `--at=<waktu ISO>` untuk waktu acuan lain dan `--apply` untuk benar-benar menulis. `scripts/try-checkout.ts <NIK>` menguji check-out lewat HTTP.
 
-Belum termasuk: device binding (cek perangkat terdaftar), rule risiko, dan koreksi absen oleh HRD. Ketiganya item terpisah.
+Belum termasuk: rule risiko dan koreksi absen oleh HRD. Keduanya item terpisah.
