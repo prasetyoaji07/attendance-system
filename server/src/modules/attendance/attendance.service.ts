@@ -4,20 +4,19 @@
  *
  * Urutan pemeriksaan mengikuti diagram alur:
  *   roster aktif -> sudah check-in? -> akurasi GPS -> jarak (Haversine) -> QR -> hitung telat -> simpan.
+ * Tiga pemeriksaan di tengah (GPS, jarak, QR) ada di presence.ts karena dipakai juga oleh check-out.
  * JWT dicek middleware. Device binding menyusul (item terpisah di TASKS Fase 2).
  */
 import { isDuplicateEntry } from '../../core/db-errors';
 import { AppError } from '../../core/errors';
 import type { AuthUser } from '../../core/middleware/auth';
 import type { AttendanceStatus } from '../../core/roles';
-import { RULES } from '../../core/rules';
 import type { TxRunner } from '../../core/service-deps';
 import { assertNoExistingCheckIn, computeDailyStatus } from '../../utils/daily-status';
-import { isWithinRadius } from '../../utils/haversine';
-import { verifyQr } from '../../utils/hmac-qr';
 import { addDays } from '../../utils/roster-rules';
 import { buildShiftWindow, pickActiveRoster, type RosterWindow, type ShiftDef } from '../../utils/shift-time';
 import type { CheckInInput } from './attendance.schema';
+import { assertPresence } from './presence';
 
 const WIB_OFFSET_MS = 7 * 3_600_000;
 
@@ -97,43 +96,8 @@ export function createAttendanceService(deps: AttendanceDeps) {
       // 2) Satu roster hanya satu check-in (aturan bisnis 3).
       assertNoExistingCheckIn({ checkInAt: roster.checkInAt });
 
-      // 3) Akurasi GPS.
-      if (input.accuracyM > RULES.maxGpsAccuracyM) {
-        throw new AppError(
-          422,
-          'GPS_ACCURACY_LOW',
-          `Sinyal GPS lemah (akurasi sekitar ${Math.round(input.accuracyM)} m, maksimal ${RULES.maxGpsAccuracyM} m). Pindah ke tempat terbuka lalu coba lagi.`,
-          { accuracyM: input.accuracyM, maxAccuracyM: RULES.maxGpsAccuracyM },
-        );
-      }
-
-      // 4) Jarak ke lokasi kerja (geofence).
-      const { ok, distanceM } = isWithinRadius(
-        { lat: input.lat, lng: input.lng },
-        { lat: roster.location.lat, lng: roster.location.lng },
-        roster.location.radiusM,
-      );
-      if (!ok) {
-        throw new AppError(
-          422,
-          'OUT_OF_RADIUS',
-          `Kamu ${Math.round(distanceM)} m dari ${roster.location.nama} (batas ${roster.location.radiusM} m).`,
-          { distanceM: Math.round(distanceM), radiusM: roster.location.radiusM },
-        );
-      }
-
-      // 5) QR dinamis: tanda tangan, masa berlaku, dan harus untuk lokasi jadwal ini.
-      const qr = verifyQr(input.qr, qrSecret, qrTtlSeconds, now.getTime());
-      if (!qr.valid) {
-        throw new AppError(
-          400,
-          'INVALID_QR',
-          qr.reason === 'EXPIRED' ? 'QR sudah kedaluwarsa. Scan ulang layar di lokasi.' : 'QR tidak valid. Scan layar di lokasi kerja.',
-        );
-      }
-      if (qr.locationId !== roster.location.id) {
-        throw new AppError(400, 'INVALID_QR', `QR ini bukan untuk lokasi jadwalmu (${roster.location.nama}).`);
-      }
+      // 3-5) Akurasi GPS, jarak ke lokasi (geofence), dan QR dinamis.
+      const { distanceM } = assertPresence(input, roster.location, now, { secret: qrSecret, ttlSeconds: qrTtlSeconds });
 
       // 6) Telat dan status dihitung oleh satu fungsi yang sama dengan penutupan harian.
       const daily = computeDailyStatus({

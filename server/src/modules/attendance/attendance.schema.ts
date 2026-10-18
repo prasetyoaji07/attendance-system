@@ -9,3 +9,7 @@ export const checkInSchema = z.object({
   qr: z.string().min(1, 'QR wajib diisi').max(200),
 });
 export type CheckInInput = z.infer<typeof checkInSchema>;
+
+/** Body POST /attendance/check-out: sama dengan check-in (kehadiran di lokasi dibuktikan lagi saat pulang). */
+export const checkOutSchema = checkInSchema;
+export type CheckOutInput = z.infer<typeof checkOutSchema>;
