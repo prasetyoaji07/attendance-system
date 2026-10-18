@@ -13,6 +13,11 @@ export function signQr(locationId: number, secret: string, ttlSeconds: number, n
   return `${locationId}.${w}.${sign(secret, `${locationId}.${w}`)}`;
 }
 
+/** Akhir window yang berlaku pada `nowMs` (epoch ms): kapan layar harus mengambil token baru. */
+export function qrWindowEndMs(nowMs: number, ttlSeconds: number): number {
+  return (windowOf(nowMs, ttlSeconds) + 1) * ttlSeconds * 1000;
+}
+
 export type QrResult =
   | { valid: true; locationId: number }
   | { valid: false; reason: 'MALFORMED' | 'BAD_SIGNATURE' | 'EXPIRED' };
