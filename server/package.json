@@ -10,7 +10,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "migrate": "tsx scripts/migrate.ts",
-    "seed": "tsx scripts/seed.ts"
+    "seed": "tsx scripts/seed.ts",
+    "seed:dry": "tsx scripts/seed.ts --dry-run"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",
