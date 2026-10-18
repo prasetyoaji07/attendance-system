@@ -1,0 +1,27 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    @apply bg-bg font-sans text-body text-text antialiased;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  h1 { @apply text-h1 tracking-tight; }
+  h2 { @apply text-h2 tracking-tight; }
+  h3 { @apply text-h3; }
+  .tabular { font-variant-numeric: tabular-nums; }
+}
+
+@layer components {
+  .card { @apply rounded-lg border border-border bg-surface p-5 shadow-2; }
+  .card-hero { @apply rounded-xl bg-grad-hero p-5 text-white shadow-4; }
+  .glass {
+    background: rgba(255, 255, 255, 0.65);
+    backdrop-filter: blur(16px) saturate(160%);
+    border: 1px solid rgba(255, 255, 255, 0.5);
+  }
+  [data-theme='dark'] .glass { background: rgba(20, 24, 38, 0.65); border-color: rgba(255, 255, 255, 0.08); }
+}

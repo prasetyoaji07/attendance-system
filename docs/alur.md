@@ -1,0 +1,304 @@
+# Rancangan Sistem Absensi
+
+> Dokumen acuan arsitektur, database, dan alur bisnis.
+> Tampilan dan komponen UI ada di `design.md`.
+> Semua data adalah **simulasi**. Angka aturan (toleransi, lembur, dll) adalah asumsi, bukan regulasi resmi.
+
+**Stack:** React + TypeScript, Node.js + Express, MySQL (TiDB Cloud), JWT, Tailwind CSS
+
+---
+
+## 1. Tujuan dan Scope
+
+**Tujuan:** sistem absensi pabrik yang punya logika bisnis nyata (shift, geofencing, approval, lembur, payroll-ready), bukan sekadar CRUD.
+
+| Fase | Isi | Status |
+|---|---|---|
+| 1 | Master data, shift, roster, engine status harian + unit test | MVP |
+| 2 | Check-in: geofencing, QR dinamis, device binding | MVP |
+| 3 | Workflow engine, cuti/izin, lembur | MVP |
+| 4 | Cron alpa, tutup periode, export Excel | MVP |
+| 5 | Dashboard, skor risiko, integrasi maintenance-system | Lanjutan |
+
+**Di luar scope MVP (tulis jujur di README):**
+- Notifikasi Telegram/email (cukup notifikasi in-app dulu)
+- Eskalasi otomatis dan delegasi approver
+- Skor risiko lanjutan
+- Aplikasi native (cukup PWA)
+- Perhitungan pajak/BPJS/gaji penuh (hanya rekap payroll-ready)
+
+---
+
+## 2. Keputusan dan Asumsi
+
+| Hal | Nilai awal | Catatan |
+|---|---|---|
+| Toleransi telat | 5 menit | Simulasi, bisa diubah per shift |
+| Akurasi GPS maksimal | 50 m | Di atas itu user diminta coba lagi |
+| Radius geofence default | 100 m | Per lokasi |
+| Masa berlaku QR dinamis | 45 detik | HMAC + expiry |
+| Jendela check-in | mulai shift -2 jam sampai selesai +2 jam | |
+| Jeda minimal antar shift | 11 jam | Validasi saat roster dibuat |
+| Periode cut-off payroll | tanggal 21 sampai 20 | Konfigurasi di tabel `periods` |
+| Lembur harian maksimal | 4 jam | Peringatan, bukan blokir |
+| Kuota cuti tahunan | 12 hari | Per `leave_types` |
+| Zona waktu | Asia/Jakarta (WIB) | Simpan UTC di DB, tampilkan WIB |
+
+> Cek ulang angka di atas dengan aturan perusahaan/regulasi terbaru sebelum dipakai sungguhan.
+
+---
+
+## 3. Arsitektur
+
+```mermaid
+flowchart LR
+    A[React + TS<br/>PWA Mobile + Dashboard] --> B[Express API]
+    B --> C[(MySQL / TiDB)]
+    D[Cron Jobs] --> B
+    B --> E[Routes]
+    E --> F[Controller]
+    F --> G[Service<br/>logika bisnis]
+    G --> H[Repository<br/>query DB]
+```
+
+**Aturan utama:** semua logika bisnis ada di `service`, supaya mudah di-unit-test. Controller hanya menerima request dan mengembalikan respons.
+
+---
+
+## 4. Struktur Folder
+
+```
+attendance-system/
+├── docs/
+│   ├── alur.md
+│   └── design.md
+├── server/src/
+│   ├── core/            # db, config, middleware (auth, rbac, error), audit
+│   ├── modules/
+│   │   ├── auth/        # login JWT, device binding
+│   │   ├── employees/   # karyawan, divisi, atasan
+│   │   ├── locations/   # titik lokasi + radius
+│   │   ├── shifts/      # master shift, pola rotasi
+│   │   ├── roster/      # jadwal harian (generate, tukar shift)
+│   │   ├── attendance/  # check-in/out, status harian, koreksi
+│   │   ├── workflow/    # engine approval (dipakai semua pengajuan)
+│   │   ├── requests/    # cuti, izin, sakit, lembur, tukar shift
+│   │   ├── overtime/    # hitung lembur
+│   │   ├── payroll/     # periode, kunci, export Excel
+│   │   └── dashboard/   # query analitik
+│   ├── jobs/            # cron: daily-close, escalation
+│   ├── utils/           # haversine.ts, shift-time.ts, hmac-qr.ts
+│   └── tests/           # unit test (status, telat, lembur, shift malam)
+├── client/src/
+│   ├── features/        # mirror modules server
+│   ├── components/ui/   # komponen dasar sesuai design.md
+│   └── styles/          # tokens.css, tailwind config
+└── database/            # migrations + seed simulasi
+```
+
+---
+
+## 5. Database
+
+### 5.1 Master
+
+| Tabel | Kolom penting |
+|---|---|
+| `departments` | id, nama, kepala_id |
+| `employees` | id, nik, nama, department_id, atasan_id, tanggal_masuk |
+| `users` | id, employee_id, password_hash, role |
+| `locations` | id, nama, lat, lng, radius_m |
+| `shifts` | id, nama, jam_mulai, jam_selesai, lintas_hari, toleransi_menit |
+| `shift_patterns` | id, nama, urutan (JSON, contoh: `["pagi","pagi","siang","siang","malam","malam","libur","libur"]`) |
+| `holidays` | id, tanggal, nama |
+| `leave_types` | id, nama, kuota_tahunan, butuh_lampiran |
+
+### 5.2 Transaksi
+
+| Tabel | Kolom penting |
+|---|---|
+| `rosters` | id, employee_id, **shift_date**, shift_id, location_id. **UNIQUE(employee_id, shift_date)** |
+| `attendance` | id, roster_id (UNIQUE), check_in_at, check_out_at, lat_in, lng_in, lat_out, lng_out, distance_m, accuracy_m, late_minutes, status |
+| `devices` | id, user_id, device_id, status (`active` / `pending`) |
+| `requests` | id, type, employee_id, payload (JSON), status, current_step |
+| `request_approvals` | id, request_id, step, approver_id, keputusan, catatan, waktu |
+| `leave_balances` | id, employee_id, tahun, kuota, terpakai |
+| `overtime_records` | id, request_id, jam_disetujui, jam_aktual, jam_dibayar, pengali |
+| `attendance_corrections` | id, attendance_id, nilai_lama, nilai_baru, alasan, status |
+
+### 5.3 Sistem
+
+`workflow_templates`, `workflow_steps` (template_id, urutan, role_approver, sla_jam), `periods` (start, end, status OPEN/LOCKED), `risk_flags`, `audit_logs`, `notifications`.
+
+**Kunci desain:** tabel `requests` bersifat generik (kolom `type`), sehingga cuti, izin, sakit, lembur, tukar shift, dan koreksi absen memakai **satu workflow engine**.
+
+### 5.4 Relasi inti
+
+```mermaid
+erDiagram
+    departments ||--o{ employees : punya
+    employees ||--|| users : akun
+    employees ||--o{ rosters : dijadwalkan
+    shifts ||--o{ rosters : dipakai
+    locations ||--o{ rosters : lokasi
+    rosters ||--o| attendance : tercatat
+    employees ||--o{ requests : mengajukan
+    requests ||--o{ request_approvals : langkah
+    employees ||--o{ leave_balances : saldo
+    requests ||--o| overtime_records : lembur
+    attendance ||--o{ attendance_corrections : koreksi
+```
+
+---
+
+## 6. Role dan Akses
+
+| Role | Hak |
+|---|---|
+| Karyawan | Absen, lihat jadwal dan rekap sendiri, ajukan request |
+| Foreman | Approve step 1, lihat tim sendiri |
+| SPV | Approve step 2, lihat divisi, atur roster |
+| HRD | Approve final, kelola master, tutup periode, export |
+| Admin | Semua, termasuk konfigurasi workflow |
+
+---
+
+## 7. Flow Utama
+
+### 7.1 Check-in
+
+```mermaid
+flowchart TD
+    A[Karyawan buka app<br/>ambil GPS + scan QR] --> B[POST /attendance/check-in]
+    B --> C{JWT valid?}
+    C -- tidak --> X1[401]
+    C -- ya --> D{Device terdaftar?}
+    D -- tidak --> X2[403 minta approval device]
+    D -- ya --> E{Roster aktif ada?<br/>cek hari ini dan kemarin}
+    E -- tidak --> X3[Tidak ada jadwal]
+    E -- ya --> F{Sudah check-in?}
+    F -- ya --> X4[409]
+    F -- tidak --> G{Accuracy ≤ 50 m?}
+    G -- tidak --> X5[Sinyal GPS lemah]
+    G -- ya --> H{Jarak ≤ radius?<br/>Haversine}
+    H -- tidak --> X6[Anda 340 m dari lokasi]
+    H -- ya --> I{QR valid?<br/>HMAC + belum expired}
+    I -- tidak --> X7[400 QR tidak valid]
+    I -- ya --> J[Hitung late_minutes]
+    J --> K[BEGIN TX, INSERT attendance, COMMIT]
+    K --> L[Cek rule risiko, simpan risk_flag]
+    L --> M[Respons: Check-in 07:03, terlambat 3 menit]
+```
+
+**Rumus telat:** `late_minutes = max(0, now - (jam_mulai + toleransi))`
+
+**Menentukan roster aktif:** ambil roster `shift_date` hari ini dan kemarin, pilih yang jendelanya `[mulai - 2 jam, selesai + 2 jam]` memuat waktu sekarang. Ini yang membuat shift malam lintas tengah malam tetap benar.
+
+### 7.2 Penutupan Harian (cron, tiap malam)
+
+```mermaid
+flowchart TD
+    A[Untuk tiap roster yang shift-nya selesai<br/>dan periode OPEN] --> B{Ada attendance?}
+    B -- lengkap --> C[Finalisasi: HADIR / TELAT / PULANG_CEPAT]
+    B -- check-in tanpa check-out --> D[Auto-close + flag perlu koreksi]
+    B -- tidak ada --> E{Ada cuti/izin/sakit APPROVED?}
+    E -- ya --> F[Status sesuai jenis]
+    E -- tidak --> G{Libur / jadwal libur?}
+    G -- ya --> H[LIBUR]
+    G -- tidak --> I[ALPA]
+```
+
+### 7.3 Workflow Approval (contoh: cuti)
+
+```mermaid
+stateDiagram-v2
+    [*] --> DRAFT
+    DRAFT --> PENDING: ajukan (validasi lolos)
+    DRAFT --> REJECTED: validasi gagal otomatis
+    PENDING --> PENDING: approve step berikutnya
+    PENDING --> APPROVED: approve step terakhir (HRD)
+    PENDING --> REJECTED: reject di step mana pun
+    PENDING --> CANCELLED: dibatalkan karyawan
+    APPROVED --> [*]
+    REJECTED --> [*]
+    CANCELLED --> [*]
+```
+
+**Validasi saat pengajuan cuti:**
+1. Saldo cukup?
+2. Tanggal tidak bentrok dengan roster yang sudah ada pengajuan lain?
+3. Kuota cuti divisi per hari belum terlewati?
+
+**Saat APPROVED:** potong `leave_balances` dan tandai roster pada tanggal tersebut sebagai CUTI.
+
+Urutan approver: Foreman, SPV, HRD. Urutan ini diambil dari `workflow_steps`, **bukan hardcode**.
+
+### 7.4 Lembur
+
+1. Karyawan mengajukan lembur (tanggal, jam rencana), masuk workflow approval.
+2. Dikerjakan, karyawan absen seperti biasa.
+3. Saat shift ditutup: `jam_dibayar = irisan(jam_disetujui, jam_absen_aktual)`.
+4. Kalikan dengan pengali dari tabel aturan (hari kerja vs libur).
+5. Beri peringatan jika melebihi batas harian atau mingguan.
+
+### 7.5 Penutupan Periode dan Payroll
+
+```mermaid
+flowchart TD
+    A[HRD pilih periode 21 - 20] --> B{Ada request PENDING<br/>atau koreksi menggantung?}
+    B -- ya --> C[Tampilkan daftar, blokir penutupan]
+    B -- tidak --> D[Generate rekap per karyawan:<br/>hadir, telat, alpa, lembur]
+    D --> E[periods.status = LOCKED]
+    E --> F[Export Excel]
+    E --> G[Perubahan setelah ini hanya lewat adjustment + audit log]
+```
+
+Generate rekap harus **idempotent**: dijalankan dua kali menghasilkan hasil yang sama.
+
+---
+
+## 8. Aturan Bisnis (wajib di-unit-test)
+
+1. Shift malam 22:00-06:00 dihitung ke `shift_date` hari mulainya.
+2. Telat dihitung dari jam mulai + toleransi, bukan jam mulai.
+3. Satu roster hanya boleh satu check-in (unique constraint).
+4. Jeda minimal antar shift ≥ 11 jam saat roster dibuat.
+5. Lembur dibayar hanya pada irisan jam disetujui dan jam terbukti.
+6. Cuti ditolak otomatis jika saldo tidak cukup.
+7. Periode LOCKED tidak bisa diubah langsung.
+8. Check-in di luar jendela waktu ditolak.
+9. QR yang sudah expired atau tanda tangannya salah ditolak.
+10. Koreksi absen tidak mengubah data langsung, hanya lewat pengajuan dan tercatat di audit log.
+
+---
+
+## 9. Kualitas Teknis
+
+- Transaksi database dan unique constraint untuk mencegah double submit.
+- Validasi di backend (jangan percaya frontend), termasuk jarak geofence.
+- RBAC di middleware, bukan hanya menyembunyikan menu.
+- Audit log untuk semua aksi sensitif (koreksi, tutup periode, ganti device, ubah master).
+- Seed data simulasi realistis (sekitar 50 karyawan, 3 bulan), dilabeli "data simulasi".
+- Privasi: lokasi hanya diambil **saat absen**, tidak dilacak terus-menerus.
+- Keterbatasan jujur: aplikasi web tidak bisa mendeteksi fake GPS, maka dilapisi QR dinamis, device binding, dan flag risiko.
+
+---
+
+## 10. Urutan Pengerjaan
+
+1. **Fondasi:** skema DB, seed, employees, shifts, roster, fungsi hitung status harian + unit test.
+2. **Check-in:** geofencing, QR dinamis, device binding.
+3. **Workflow engine** untuk cuti/izin, lalu lembur.
+4. **Cron dan rekap:** alpa otomatis, penguncian periode, export Excel.
+5. **Dashboard** dan skor risiko.
+6. **Integrasi** maintenance-system (satu login, mekanik cuti tidak bisa ditugaskan), deploy, README dengan screenshot.
+
+---
+
+## 11. Checklist Sebelum Mulai Coding
+
+- [ ] Asumsi di bagian 2 sudah dikonfirmasi
+- [ ] `design.md` dibaca dan token dipasang dulu di Tailwind
+- [ ] Repo dibuat, dokumen ini di-commit sebagai commit pertama
+- [ ] Skema DDL fase 1 ditulis dan di-review
+- [ ] Unit test untuk aturan bisnis 1-3 ditulis sebelum implementasinya
