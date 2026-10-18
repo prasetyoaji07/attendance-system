@@ -176,7 +176,7 @@ flowchart TD
     C -- tidak --> X1[401]
     C -- ya --> D{Device terdaftar?}
     D -- tidak --> X2[403 minta approval device]
-    D -- ya --> E{Roster aktif ada?<br/>cek hari ini dan kemarin}
+    D -- ya --> E{Roster aktif ada?<br/>cek kemarin, hari ini, dan besok}
     E -- tidak --> X3[Tidak ada jadwal]
     E -- ya --> F{Sudah check-in?}
     F -- ya --> X4[409]
@@ -194,7 +194,7 @@ flowchart TD
 
 **Rumus telat:** `late_minutes = max(0, now - (jam_mulai + toleransi))`
 
-**Menentukan roster aktif:** ambil roster `shift_date` hari ini dan kemarin, pilih yang jendelanya `[mulai - 2 jam, selesai + 2 jam]` memuat waktu sekarang. Ini yang membuat shift malam lintas tengah malam tetap benar.
+**Menentukan roster aktif:** ambil roster `shift_date` kemarin, hari ini, dan besok, pilih yang jendelanya `[mulai - 2 jam, selesai + 2 jam]` memuat waktu sekarang. Ini yang membuat shift malam lintas tengah malam tetap benar.
 
 ### 7.2 Penutupan Harian (cron, tiap malam)
 
@@ -215,6 +215,12 @@ flowchart TD
 - Prioritas status saat hadir: `TELAT` > `PULANG_CEPAT` > `HADIR`. Menit telat dan menit pulang cepat tetap dilaporkan terpisah.
 - Belum final selama shift belum selesai (`now < selesai`). Check-in tanpa check-out setelah selesai: status dari check-in + flag perlu koreksi.
 - Tanpa attendance setelah selesai: cuti/izin/sakit APPROVED, lalu libur nasional (`LIBUR`), selain itu `ALPA`. Kehadiran nyata selalu menang atas cuti/izin/sakit.
+
+**Check-out dan batas waktu** (`POST /attendance/check-out`):
+- Yang dicari adalah absen terakhir karyawan (`check_in_at` terbaru), bukan lewat jendela roster, supaya shift malam tetap menempel ke tanggal mulainya.
+- Batas akhir check-out = jam selesai shift + `RULES.checkinWindowHoursAfter` (2 jam). Tepat di batas masih boleh.
+- Absen yang punya check-in tanpa check-out dan sudah lewat batas ditutup otomatis (cron tiap 15 menit, hanya jika `RUN_JOBS=true`): `auto_closed=1` dan `needs_correction=1`. `check_out_at` dibiarkan kosong karena jam pulang tidak boleh dikarang. Koreksinya lewat pengajuan ke HRD (Fase 3). Proses ini idempoten dan tercatat di audit log.
+- Penutupan harian untuk status ALPA, LIBUR, dan cuti (`jobs/daily-close.ts`) tetap di Fase 4.
 
 ### 7.3 Workflow Approval (contoh: cuti)
 

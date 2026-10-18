@@ -8,7 +8,7 @@ Centang saat selesai. Urutan penting: fase berikutnya bergantung pada fase sebel
 - [x] `haversine.ts` dan `hmac-qr.ts` + unit test
 - [x] Migration runner (`npm run migrate`)
 - [x] Isi `server/.env` dan pastikan `/api/health` menunjukkan `db: ok`
-- [ ] Commit pertama (docs + scaffold)
+- [x] Commit pertama (docs + scaffold)
 
 ## Fase 1: Fondasi (master data, shift, roster, engine status)
 - [x] `database/migrations/001_init.sql`: semua tabel master + `rosters`, `attendance`, `audit_logs` (lihat alur.md bagian 5)
@@ -17,12 +17,12 @@ Centang saat selesai. Urutan penting: fase berikutnya bergantung pada fase sebel
 - [x] Modul `employees`, `locations`, `shifts` (CRUD + validasi zod + RBAC; karyawan dinonaktifkan, bukan dihapus; termasuk divisi)
 - [x] Modul `roster`: generate dari `shift_patterns`, validasi jeda >= 11 jam (+ pola shift, daftar jadwal; tukar shift menyusul di Fase 3)
 - [x] Fungsi status harian (pure, `utils/daily-status.ts`) + test aturan bisnis 1-4 (aturan 5-7 dan 10 menunggu modulnya)
-- [ ] `scripts/seed.ts`: 50 karyawan, 5 divisi, roster 12 bulan ke belakang + 30 hari ke depan (~14 ribu baris) + absen historis dengan profil telat per divisi (label "data simulasi"). Kode sudah ada (`utils/seed-attendance.ts`, `utils/seed-data.ts`, tes); centang setelah `npm run seed` berhasil di databasemu
-- [ ] Client: login, AppShell (sidebar desktop + bottom nav mobile), halaman Jadwal
+- [x] `scripts/seed.ts`: 50 karyawan, 5 divisi, roster 12 bulan ke belakang + 30 hari ke depan (~14 ribu baris) + absen historis dengan profil telat per divisi (label "data simulasi"). Kode di `utils/seed-attendance.ts`, `utils/seed-data.ts` (+ tes); sudah dijalankan lewat `npm run seed`
+- [x] Client: login, AppShell (sidebar desktop + bottom nav mobile), halaman Jadwal
 
 ## Fase 2: Check-in
 - [x] Endpoint `POST /attendance/check-in` sesuai flow alur.md 7.1
-- [ ] Check-out + auto-close
+- [x] Check-out + auto-close (`POST /attendance/check-out`, `jobs/auto-close.ts`; cron 15 menit: kode ada, tick nyata di server belum terbukti)
 - [ ] Endpoint QR dinamis per lokasi (layar yang ditampilkan di lokasi)
 - [ ] Device binding (daftar, pending, approval ganti device)
 - [ ] Client: komponen `AttendanceButton` (tombol Absen 3D, 4 state) + chip jarak/akurasi
@@ -32,12 +32,12 @@ Centang saat selesai. Urutan penting: fase berikutnya bergantung pada fase sebel
 ## Fase 3: Workflow dan Pengajuan
 - [ ] Tabel + modul `workflow` (templates, steps) dan state machine request
 - [ ] Cuti: validasi saldo, bentrok roster, kuota divisi; potong saldo saat APPROVED
-- [ ] Izin, sakit, tukar shift, koreksi absen (pakai engine yang sama)
+- [ ] Izin, sakit, tukar shift, koreksi absen (pakai engine yang sama; antrean koreksi untuk absen `needs_correction`)
 - [ ] Lembur: pengajuan + hitung irisan jam + pengali dari tabel aturan
 - [ ] Client: form pengajuan, timeline approval, halaman approval untuk Foreman/SPV/HRD
 
 ## Fase 4: Cron dan Payroll
-- [ ] `jobs/daily-close.ts` (alpa otomatis, auto-close, idempotent)
+- [ ] `jobs/daily-close.ts` (alpa otomatis, idempotent; auto-close absen terbuka sudah di Fase 2)
 - [ ] Periode: cek request menggantung, LOCK, adjustment berlog
 - [ ] Export Excel rekap (exceljs): hadir, telat, alpa, lembur, rapi dan berformat
 - [ ] Test aturan bisnis 5-7 dan 10

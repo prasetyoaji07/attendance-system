@@ -1,4 +1,4 @@
-# Referensi API (Fase 1)
+# Referensi API
 
 Semua endpoint di bawah `/api`. Kecuali `POST /auth/login`, semuanya butuh header `Authorization: Bearer <token>`.
 Respons sukses berbentuk `{ "data": ... }` (daftar karyawan: `{ data, total, page, limit }`).
@@ -67,10 +67,12 @@ Rantai atasan tidak boleh melingkar. Semua perubahan master tercatat di `audit_l
 
 ## Attendance (Fase 2)
 
-
 | Method | Path | Akses | Keterangan |
 |---|---|---|---|
 | POST | `/attendance/check-in` | login | check-in untuk roster yang jendelanya sedang terbuka |
+| POST | `/attendance/check-out` | login | check-out untuk absen terakhir yang masih terbuka |
+
+### Check-in
 
 `POST /attendance/check-in` body: `{ lat, lng, accuracyM, qr }`
 - `lat`, `lng`: koordinat dari Geolocation API (lat -90..90, lng -180..180). `accuracyM`: akurasi GPS dalam meter. `qr`: token hasil scan layar lokasi.
@@ -89,4 +91,34 @@ Rantai atasan tidak boleh melingkar. Semua perubahan master tercatat di `audit_l
 | 422 | `GPS_ACCURACY_LOW` | akurasi lebih besar dari `RULES.maxGpsAccuracyM` (50 m). `details`: `{ accuracyM, maxAccuracyM }` |
 | 422 | `OUT_OF_RADIUS` | lebih jauh dari radius lokasi. `details`: `{ distanceM, radiusM }` |
 
-Belum termasuk: device binding (cek perangkat terdaftar) dan rule risiko. Keduanya item terpisah.
+### Check-out
+
+`POST /attendance/check-out` body: `{ lat, lng, accuracyM, qr }` (sama dengan check-in)
+- **Absen yang dicari** adalah ABSEN TERAKHIR karyawan (`check_in_at` terbaru), bukan lewat jendela roster. Dengan begini shift malam yang lewat tengah malam tetap menempel ke roster tanggal mulainya.
+- **Batas akhir check-out** = jam selesai shift + `RULES.checkinWindowHoursAfter` (2 jam). Tepat di batas masih boleh (inklusif).
+- Urutan pemeriksaan: absen terakhir, sudah check-out, batas waktu, akurasi GPS, jarak, QR, hitung, lalu simpan. Pemeriksaan GPS, jarak, dan QR sama dengan check-in.
+- Status dari `computeDailyStatus`: `TELAT` > `PULANG_CEPAT` > `HADIR`. Pulang cepat = check-out sebelum jam selesai - toleransi shift. `lateMinutes` dan `earlyLeaveMinutes` dilaporkan terpisah. Jarak dan akurasi saat check-out tidak disimpan.
+- Sukses: `200` `{ data: { attendanceId, rosterId, shiftDate, shiftNama, locationNama, checkInAt (ISO UTC), checkOutAt (ISO UTC), status, lateMinutes, earlyLeaveMinutes, workedMinutes, distanceM, message } }`. Contoh `message`: `Check-out 13:40, pulang 15 menit lebih awal`, atau `Check-out 14:02` jika tidak pulang cepat.
+- UPDATE hanya mengenai baris yang masih terbuka (`check_out_at` kosong dan belum auto-close). Dua request bersamaan, atau auto-close yang menyalip, berakhir `409`.
+
+| Status | Kode | Arti |
+|---|---|---|
+| 400 | `VALIDATION_ERROR` | body tidak sesuai skema |
+| 400 | `INVALID_QR` | sama dengan check-in |
+| 401 | `UNAUTHORIZED` | belum login atau token tidak valid |
+| 409 | `CONFLICT` | absen ini sudah check-out (selama masih dalam batas waktu), atau keburu ditutup di antara dua request |
+| 422 | `NO_OPEN_ATTENDANCE` | belum pernah check-in, atau absen terakhir sudah check-out dan batas waktunya lewat |
+| 422 | `CHECKOUT_WINDOW_CLOSED` | batas waktu check-out lewat, atau absen sudah ditutup otomatis. Pesan: ajukan koreksi absen ke HRD |
+| 422 | `GPS_ACCURACY_LOW` | sama dengan check-in |
+| 422 | `OUT_OF_RADIUS` | sama dengan check-in |
+
+### Penutupan otomatis (tanpa endpoint)
+
+Absen yang punya check-in tetapi `check_out_at` kosong dan sudah lewat batas akhir check-out ditutup otomatis oleh job `runAutoClose`:
+- `auto_closed = 1` dan `needs_correction = 1`. `check_out_at` **dibiarkan kosong**: jam pulang tidak boleh dikarang. Koreksinya lewat pengajuan ke HRD (Fase 3).
+- Idempoten. UPDATE hanya mengenai baris dengan `check_out_at IS NULL AND auto_closed = 0`, jadi aman dijalankan berulang.
+- Tiap absen ditutup dalam transaksinya sendiri dan dicatat di `audit_logs` (`ATTENDANCE_AUTO_CLOSE`, `userId` kosong).
+- Dijadwalkan setiap 15 menit lewat node-cron, hanya jika `RUN_JOBS=true` di `server/.env` (default `false`).
+- Alat uji lokal: `npx tsx scripts/try-autoclose.ts` (dari folder `server`) hanya melihat absen yang akan ditutup. Tambahkan `--at=<waktu ISO>` untuk waktu acuan lain dan `--apply` untuk benar-benar menulis. `scripts/try-checkout.ts <NIK>` menguji check-out lewat HTTP.
+
+Belum termasuk: device binding (cek perangkat terdaftar), rule risiko, dan koreksi absen oleh HRD. Ketiganya item terpisah.
