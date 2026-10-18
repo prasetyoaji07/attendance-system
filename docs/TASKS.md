@@ -23,7 +23,7 @@ Centang saat selesai. Urutan penting: fase berikutnya bergantung pada fase sebel
 ## Fase 2: Check-in
 - [x] Endpoint `POST /attendance/check-in` sesuai flow alur.md 7.1
 - [x] Check-out + auto-close (`POST /attendance/check-out`, `jobs/auto-close.ts`; cron 15 menit: kode ada, tick nyata di server belum terbukti)
-- [ ] Endpoint QR dinamis per lokasi (layar yang ditampilkan di lokasi)
+- [x] Endpoint QR dinamis per lokasi: `GET /locations/:id/qr` (HRD/ADMIN). Halaman layar yang menampilkannya menyusul bersama item client
 - [ ] Device binding (daftar, pending, approval ganti device)
 - [ ] Client: komponen `AttendanceButton` (tombol Absen 3D, 4 state) + chip jarak/akurasi
 - [ ] Client: scan QR (kamera) + Geolocation API

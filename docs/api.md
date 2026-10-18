@@ -25,6 +25,14 @@ Respons error berbentuk `{ "error": { "code", "message", "details?" } }`.
 | POST | `/locations` | HRD, ADMIN | `{ nama, lat, lng, radiusM? }`. Radius 10-2000 m, default 100 |
 | PATCH | `/locations/:id` | HRD, ADMIN | parsial |
 | DELETE | `/locations/:id` | HRD, ADMIN | ditolak (409) jika dipakai roster |
+| GET | `/locations/:id/qr` | HRD, ADMIN | token QR dinamis untuk layar di lokasi, lihat di bawah |
+
+`GET /locations/:id/qr` -> `{ data: { locationId, locationNama, token, refreshAt (ISO UTC), ttlSeconds } }`
+- `token` berformat `locationId.window.signature` dan berganti tiap `ttlSeconds` (`RULES.qrTtlSeconds`, 45 detik). Layar mengambil token baru pada `refreshAt` (akhir window sekarang).
+- Diverifikasi oleh check-in dan check-out dengan fungsi yang sama (`verifyQr`). Token masih diterima sampai akhir window berikutnya (toleransi 1 window), jadi layar yang telat refresh beberapa detik tidak membuat scan gagal.
+- Hanya HRD dan ADMIN: layar di lokasi memakai akun mereka. Karyawan biasa 403, tanpa token 401, lokasi tidak ada 404, id bukan angka 400.
+- Respons memakai `Cache-Control: no-store`. Tidak dicatat di `audit_logs` (hanya membaca, dipanggil terus-menerus).
+- Skrip uji: `npx tsx scripts/try-qr.ts` (dari folder `server`).
 
 ## Divisi
 | Method | Path | Akses | Keterangan |
