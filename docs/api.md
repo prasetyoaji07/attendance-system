@@ -64,3 +64,29 @@ Rantai atasan tidak boleh melingkar. Semua perubahan master tercatat di `audit_l
 - Respons: `{ data: { dryRun, from, to, created, skipped: [{ employeeId, shiftDate }] } }`. Tercatat di `audit_logs` (`ROSTER_GENERATE`).
 - Batas: rentang maks 62 hari, maks 200 karyawan per proses. Karyawan harus aktif.
 - Catatan: SPV saat ini bisa membuat jadwal untuk karyawan mana pun (pembatasan per divisi menyusul).
+
+## Attendance (Fase 2)
+
+
+| Method | Path | Akses | Keterangan |
+|---|---|---|---|
+| POST | `/attendance/check-in` | login | check-in untuk roster yang jendelanya sedang terbuka |
+
+`POST /attendance/check-in` body: `{ lat, lng, accuracyM, qr }`
+- `lat`, `lng`: koordinat dari Geolocation API (lat -90..90, lng -180..180). `accuracyM`: akurasi GPS dalam meter. `qr`: token hasil scan layar lokasi.
+- **Roster aktif**: dicari dari roster dengan tanggal mulai shift kemarin, hari ini, dan besok. Dipilih yang jendelanya `[mulai - 2 jam, selesai + 2 jam]` memuat waktu sekarang. Jika dua jendela tumpang tindih, dipilih yang jam mulainya paling dekat. Dengan begini shift malam yang melewati tengah malam tetap benar. "Besok" ditambahkan agar shift yang mulai sehabis tengah malam bisa check-in malam sebelumnya.
+- Urutan pemeriksaan: roster aktif, sudah check-in, akurasi GPS, jarak (Haversine), QR, lalu hitung telat dan simpan. Check-in pertama yang gagal menghentikan proses.
+- `late_minutes = max(0, sekarang - (jam_mulai + toleransi))`. Status `TELAT` jika lebih dari 0, selain itu `HADIR` (fungsi yang sama dengan `computeDailyStatus`).
+- Sukses: `201` `{ data: { attendanceId, rosterId, shiftDate, shiftNama, locationNama, checkInAt (ISO UTC), status, lateMinutes, distanceM, message } }`. Contoh `message`: `Check-in 07:12, terlambat 7 menit`.
+
+| Status | Kode | Arti |
+|---|---|---|
+| 400 | `VALIDATION_ERROR` | body tidak sesuai skema |
+| 400 | `INVALID_QR` | QR rusak, tanda tangan salah, kedaluwarsa, atau untuk lokasi lain |
+| 401 | `UNAUTHORIZED` | belum login atau token tidak valid |
+| 409 | `CONFLICT` | roster ini sudah punya check-in (aturan bisnis 3). Penjaga kedua: `UNIQUE(roster_id)` |
+| 422 | `NO_ACTIVE_ROSTER` | tidak ada roster yang jendelanya terbuka sekarang |
+| 422 | `GPS_ACCURACY_LOW` | akurasi lebih besar dari `RULES.maxGpsAccuracyM` (50 m). `details`: `{ accuracyM, maxAccuracyM }` |
+| 422 | `OUT_OF_RADIUS` | lebih jauh dari radius lokasi. `details`: `{ distanceM, radiusM }` |
+
+Belum termasuk: device binding (cek perangkat terdaftar) dan rule risiko. Keduanya item terpisah.

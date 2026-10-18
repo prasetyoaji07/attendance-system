@@ -286,7 +286,12 @@ Generate rekap harus **idempotent**: dijalankan dua kali menghasilkan hasil yang
 - Validasi di backend (jangan percaya frontend), termasuk jarak geofence.
 - RBAC di middleware, bukan hanya menyembunyikan menu.
 - Audit log untuk semua aksi sensitif (koreksi, tutup periode, ganti device, ubah master).
-- Seed data simulasi realistis (sekitar 50 karyawan, 3 bulan), dilabeli "data simulasi".
+- Seed data simulasi realistis (50 karyawan, 5 divisi, roster 12 bulan ke belakang + 30 hari ke depan, absen historis), dilabeli "data simulasi". Rentang 12 bulan dipilih supaya grafik tahunan dashboard punya 12 titik per divisi.
+  - Absen historis dibuat oleh `utils/seed-attendance.ts` (pure, deterministik per `NIK|tanggal`). Status **tidak ditulis tangan**: jam check-in/out dibuat, lalu status dan menit telat dihitung `computeDailyStatus`.
+  - Status yang diisi: `HADIR`, `TELAT`, `PULANG_CEPAT`, `ALPA`, dan `LIBUR` (hari libur nasional, tanpa jam). `CUTI/IZIN/SAKIT` tidak diisi karena harus berasal dari pengajuan APPROVED (Fase 3).
+  - Profil telat dasar per divisi: Gudang 16%, Produksi 10%, Maintenance 7%, Quality Control 4%, HR 2,5%; Senin 1,4x; ~8% karyawan telat kronis. Hanya roster yang shift-nya sudah selesai yang diberi absen.
+  - Query dashboard: baris `LIBUR` harus dikeluarkan dari penyebut tingkat kehadiran/telat.
+  - Hari libur di tabel `holidays` (termasuk cuti bersama, ditandai di nama) diverifikasi dari SKB 3 Menteri 2025/2026.
 - Privasi: lokasi hanya diambil **saat absen**, tidak dilacak terus-menerus.
 - Keterbatasan jujur: aplikasi web tidak bisa mendeteksi fake GPS, maka dilapisi QR dinamis, device binding, dan flag risiko.
 

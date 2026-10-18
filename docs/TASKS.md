@@ -17,11 +17,11 @@ Centang saat selesai. Urutan penting: fase berikutnya bergantung pada fase sebel
 - [x] Modul `employees`, `locations`, `shifts` (CRUD + validasi zod + RBAC; karyawan dinonaktifkan, bukan dihapus; termasuk divisi)
 - [x] Modul `roster`: generate dari `shift_patterns`, validasi jeda >= 11 jam (+ pola shift, daftar jadwal; tukar shift menyusul di Fase 3)
 - [x] Fungsi status harian (pure, `utils/daily-status.ts`) + test aturan bisnis 1-4 (aturan 5-7 dan 10 menunggu modulnya)
-- [ ] `scripts/seed.ts`: ~50 karyawan, 3 bulan roster (label "data simulasi")
+- [ ] `scripts/seed.ts`: 50 karyawan, 5 divisi, roster 12 bulan ke belakang + 30 hari ke depan (~14 ribu baris) + absen historis dengan profil telat per divisi (label "data simulasi"). Kode sudah ada (`utils/seed-attendance.ts`, `utils/seed-data.ts`, tes); centang setelah `npm run seed` berhasil di databasemu
 - [ ] Client: login, AppShell (sidebar desktop + bottom nav mobile), halaman Jadwal
 
 ## Fase 2: Check-in
-- [ ] Endpoint `POST /attendance/check-in` sesuai flow alur.md 7.1
+- [x] Endpoint `POST /attendance/check-in` sesuai flow alur.md 7.1
 - [ ] Check-out + auto-close
 - [ ] Endpoint QR dinamis per lokasi (layar yang ditampilkan di lokasi)
 - [ ] Device binding (daftar, pending, approval ganti device)
@@ -43,7 +43,7 @@ Centang saat selesai. Urutan penting: fase berikutnya bergantung pada fase sebel
 - [ ] Test aturan bisnis 5-7 dan 10
 
 ## Fase 5: Dashboard, Risiko, Integrasi
-- [ ] Dashboard HRD: kehadiran, heatmap telat, tren per divisi, lembur vs anggaran
+- [ ] Dashboard HRD: kehadiran, heatmap telat, tren per divisi (bulanan + tahunan, data dari seed 12 bulan), peringkat paling rajin, lembur vs anggaran
 - [ ] Rule risiko sederhana (koordinat identik berulang, dll) + `risk_flags`
 - [ ] Prediksi absensi (WMA, sambungkan dengan pengalaman skripsi)
 - [ ] Integrasi maintenance-system (satu login, mekanik cuti tidak bisa ditugaskan)
