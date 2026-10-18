@@ -5,8 +5,11 @@
  *   npx tsx scripts/try-checkout.ts <NIK> --lat=-6.5 --lng=107 (di luar radius)
  *   npx tsx scripts/try-checkout.ts <NIK> --acc=80             (akurasi GPS lemah)
  *   npx tsx scripts/try-checkout.ts <NIK> --bad-qr             (QR rusak)
+ *   npx tsx scripts/try-checkout.ts <NIK> --device=ID-LAIN     (ID perangkat tertentu)
  * Opsi lain: --password=... (default simulasi123), --base=http://127.0.0.1:3001/api
+ * Perangkat: memakai "try-script-<NIK>" dan mendaftarkannya dulu (device binding). Sama dengan try-checkin.ts.
  * Skrip ini hanya MEMBACA absen terakhir karyawan dari database, lalu memanggil API. Tidak mencetak rahasia.
+ * PERHATIAN: selama batas waktu check-out belum lewat, skrip ini melakukan check-out SUNGGUHAN.
  * Semua data adalah simulasi.
  */
 import type { RowDataPacket } from 'mysql2';
@@ -36,7 +39,7 @@ interface LatestRow extends RowDataPacket {
 async function main() {
   const nik = process.argv.slice(2).find((a) => !a.startsWith('--'));
   if (!nik) {
-    console.error('Pemakaian: npx tsx scripts/try-checkout.ts <NIK> [--lat= --lng= --acc= --bad-qr]');
+    console.error('Pemakaian: npx tsx scripts/try-checkout.ts <NIK> [--lat= --lng= --acc= --bad-qr --device=]');
     process.exit(1);
   }
   const base = arg('base') ?? 'http://127.0.0.1:3001/api';
@@ -63,7 +66,7 @@ async function main() {
         `auto-close ${Number(latest.autoClosed) === 1 ? 'ya' : 'tidak'}`,
     );
   } else {
-    console.log(`Karyawan ${nik} belum punya absen sama sekali (yang diuji: NO_OPEN_ATTENDANCE).`);
+    console.log(`Belum ada absen untuk NIK ${nik} di database (NIK salah ketik, atau memang belum pernah absen). Yang diuji: respons "tidak ada absen terbuka".`);
   }
 
   // 2) Login.
@@ -78,7 +81,17 @@ async function main() {
     process.exit(1);
   }
 
-  // 3) Susun body check-out.
+  // 3) Device binding: daftarkan perangkat skrip (aman diulang).
+  const deviceId = arg('device') ?? `try-script-${nik}`;
+  const regRes = await fetch(`${base}/devices/register`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${loginBody.token}` },
+    body: JSON.stringify({ deviceId }),
+  });
+  const regBody = (await regRes.json().catch(() => null)) as { data?: { status: string } } | null;
+  console.log(`Perangkat ${deviceId}: ${regBody?.data ? regBody.data.status : `pendaftaran gagal (HTTP ${regRes.status})`}`);
+
+  // 4) Susun body check-out.
   const locationId = latest ? Number(latest.locationId) : 1;
   const lat = arg('lat') !== undefined ? Number(arg('lat')) : latest ? Number(latest.lat) : 0;
   const lng = arg('lng') !== undefined ? Number(arg('lng')) : latest ? Number(latest.lng) : 0;
@@ -88,7 +101,7 @@ async function main() {
   console.log(`Kirim check-out: lat ${lat}, lng ${lng}, akurasi ${accuracyM} m, QR ${flag('bad-qr') ? 'RUSAK (sengaja)' : 'valid'}`);
   const res = await fetch(`${base}/attendance/check-out`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${loginBody.token}` },
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${loginBody.token}`, 'X-Device-Id': deviceId },
     body: JSON.stringify({ lat, lng, accuracyM, qr }),
   });
   console.log(`HTTP ${res.status}`);
