@@ -210,6 +210,12 @@ flowchart TD
     G -- tidak --> I[ALPA]
 ```
 
+**Status harian satu roster** (`utils/daily-status.ts`, pure, dipakai check-in/out dan cron):
+- Telat = check-in setelah jam mulai + toleransi shift. **Pulang cepat** = check-out sebelum jam selesai - toleransi shift yang sama. Menit dibulatkan ke bawah.
+- Prioritas status saat hadir: `TELAT` > `PULANG_CEPAT` > `HADIR`. Menit telat dan menit pulang cepat tetap dilaporkan terpisah.
+- Belum final selama shift belum selesai (`now < selesai`). Check-in tanpa check-out setelah selesai: status dari check-in + flag perlu koreksi.
+- Tanpa attendance setelah selesai: cuti/izin/sakit APPROVED, lalu libur nasional (`LIBUR`), selain itu `ALPA`. Kehadiran nyata selalu menang atas cuti/izin/sakit.
+
 ### 7.3 Workflow Approval (contoh: cuti)
 
 ```mermaid

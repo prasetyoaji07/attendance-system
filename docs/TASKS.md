@@ -16,7 +16,7 @@ Centang saat selesai. Urutan penting: fase berikutnya bergantung pada fase sebel
 - [x] Modul `auth`: login JWT, hash password, `GET /auth/me` (device binding menyusul di Fase 2)
 - [x] Modul `employees`, `locations`, `shifts` (CRUD + validasi zod + RBAC; karyawan dinonaktifkan, bukan dihapus; termasuk divisi)
 - [x] Modul `roster`: generate dari `shift_patterns`, validasi jeda >= 11 jam (+ pola shift, daftar jadwal; tukar shift menyusul di Fase 3)
-- [ ] Fungsi status harian (pure) + test aturan bisnis 1-4
+- [x] Fungsi status harian (pure, `utils/daily-status.ts`) + test aturan bisnis 1-4 (aturan 5-7 dan 10 menunggu modulnya)
 - [ ] `scripts/seed.ts`: ~50 karyawan, 3 bulan roster (label "data simulasi")
 - [ ] Client: login, AppShell (sidebar desktop + bottom nav mobile), halaman Jadwal
 
