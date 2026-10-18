@@ -1,5 +1,6 @@
 import { CalendarDays, CircleCheck, LogOut, Moon, Sun, type LucideIcon } from 'lucide-react';
 import { NavLink, Outlet } from 'react-router-dom';
+import DeviceBanner from '@/components/DeviceBanner';
 import { Button } from '@/components/ui/Button';
 import { useAuth } from '@/lib/auth';
 import { useTheme } from '@/lib/theme';
@@ -90,6 +91,7 @@ export default function AppShell() {
       </header>
 
       <main className="mx-auto w-full max-w-5xl px-4 pb-28 pt-4 md:px-8 md:pb-10 md:pt-8">
+        <DeviceBanner />
         <Outlet />
       </main>
 
