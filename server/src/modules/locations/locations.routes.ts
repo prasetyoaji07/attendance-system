@@ -1,9 +1,17 @@
 import { Router } from 'express';
+import { requireAuth } from '../../core/middleware/auth';
+import { requireRole } from '../../core/middleware/rbac';
+import { validate } from '../../core/middleware/validate';
+import { idParams } from '../../core/schemas';
+import { create, get, list, remove, update } from './locations.controller';
+import { createLocationSchema, updateLocationSchema } from './locations.schema';
 
 export const locationsRoutes = Router();
+const canManage = requireRole('HRD', 'ADMIN');
 
-// FASE 1: titik lokasi dan radius geofence
-// Pola file di modul ini: locations.routes.ts -> locations.controller.ts -> locations.service.ts -> locations.repository.ts
-// Logika bisnis HANYA di service. Controller tipis. Validasi input pakai zod (core/middleware/validate).
-
-locationsRoutes.get('/_ping', (_req, res) => res.json({ module: 'locations', status: 'stub' }));
+locationsRoutes.use(requireAuth);
+locationsRoutes.get('/', list);
+locationsRoutes.get('/:id', validate(idParams, 'params'), get);
+locationsRoutes.post('/', canManage, validate(createLocationSchema), create);
+locationsRoutes.patch('/:id', canManage, validate(idParams, 'params'), validate(updateLocationSchema), update);
+locationsRoutes.delete('/:id', canManage, validate(idParams, 'params'), remove);

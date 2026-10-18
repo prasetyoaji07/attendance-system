@@ -45,17 +45,23 @@ function wibToDate(y: number, mo: number, d: number, h: number, min: number, day
   return new Date(Date.UTC(y, mo - 1, d + dayOffset, h - WIB_OFFSET_HOURS, min));
 }
 
+/** True jika shift selesai di hari berikutnya (selesai <= mulai, mis. 22:00-06:00). */
+export function isOvernight(startTime: string, endTime: string): boolean {
+  const [sh, sm] = parseTime(startTime);
+  const [eh, em] = parseTime(endTime);
+  return eh * 60 + em <= sh * 60 + sm;
+}
+
 /** Ubah shift_date + ShiftDef menjadi waktu mulai/selesai absolut (tangani shift malam). */
 export function buildShiftWindow(shiftDate: string, shift: ShiftDef): RosterWindow {
   const [y, mo, d] = parseDate(shiftDate);
   const [sh, sm] = parseTime(shift.startTime);
   const [eh, em] = parseTime(shift.endTime);
 
-  const crossesMidnight = eh * 60 + em <= sh * 60 + sm;
   return {
     shiftDate,
     startsAt: wibToDate(y, mo, d, sh, sm),
-    endsAt: wibToDate(y, mo, d, eh, em, crossesMidnight ? 1 : 0),
+    endsAt: wibToDate(y, mo, d, eh, em, isOvernight(shift.startTime, shift.endTime) ? 1 : 0),
   };
 }
 

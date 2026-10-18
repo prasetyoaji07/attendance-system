@@ -1,9 +1,17 @@
 import { Router } from 'express';
+import { requireAuth } from '../../core/middleware/auth';
+import { requireRole } from '../../core/middleware/rbac';
+import { validate } from '../../core/middleware/validate';
+import { idParams } from '../../core/schemas';
+import { create, get, list, remove, update } from './shifts.controller';
+import { createShiftSchema, updateShiftSchema } from './shifts.schema';
 
 export const shiftsRoutes = Router();
+const canManage = requireRole('HRD', 'ADMIN');
 
-// FASE 1: master shift dan pola rotasi
-// Pola file di modul ini: shifts.routes.ts -> shifts.controller.ts -> shifts.service.ts -> shifts.repository.ts
-// Logika bisnis HANYA di service. Controller tipis. Validasi input pakai zod (core/middleware/validate).
-
-shiftsRoutes.get('/_ping', (_req, res) => res.json({ module: 'shifts', status: 'stub' }));
+shiftsRoutes.use(requireAuth);
+shiftsRoutes.get('/', list);
+shiftsRoutes.get('/:id', validate(idParams, 'params'), get);
+shiftsRoutes.post('/', canManage, validate(createShiftSchema), create);
+shiftsRoutes.patch('/:id', canManage, validate(idParams, 'params'), validate(updateShiftSchema), update);
+shiftsRoutes.delete('/:id', canManage, validate(idParams, 'params'), remove);
