@@ -1,7 +1,9 @@
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import type { ReactNode } from 'react';
 import AppShell from '@/components/AppShell';
+import RequireRole from '@/components/RequireRole';
 import { useAuth } from '@/lib/auth';
+import Devices from '@/pages/Devices';
 import Home from '@/pages/Home';
 import Login from '@/pages/Login';
 import Schedule from '@/pages/Schedule';
@@ -27,6 +29,14 @@ export default function App() {
         }
       >
         <Route path="/jadwal" element={<Schedule />} />
+        <Route
+          path="/perangkat"
+          element={
+            <RequireRole roles={['HRD', 'ADMIN']}>
+              <Devices />
+            </RequireRole>
+          }
+        />
         <Route path="/setup" element={<Home />} />
         {/* TODO: pengajuan, approval, dashboard */}
       </Route>

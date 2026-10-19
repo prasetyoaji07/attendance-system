@@ -1,19 +1,22 @@
-import { CalendarDays, CircleCheck, LogOut, Moon, Sun, type LucideIcon } from 'lucide-react';
+import { CalendarDays, CircleCheck, LogOut, Moon, Smartphone, Sun, type LucideIcon } from 'lucide-react';
 import { NavLink, Outlet } from 'react-router-dom';
 import DeviceBanner from '@/components/DeviceBanner';
 import { Button } from '@/components/ui/Button';
-import { useAuth } from '@/lib/auth';
+import { useAuth, type Role } from '@/lib/auth';
 import { useTheme } from '@/lib/theme';
 
 interface NavItem {
   to: string;
   label: string;
   icon: LucideIcon;
+  /** Kosong = semua role. Hanya menyaring menu; server tetap penjaga akses. */
+  roles?: Role[];
 }
 
 // Tambah item di sini saat halaman baru jadi (Beranda, Pengajuan, Approval, Dashboard).
 const NAV: NavItem[] = [
   { to: '/jadwal', label: 'Jadwal', icon: CalendarDays },
+  { to: '/perangkat', label: 'Perangkat', icon: Smartphone, roles: ['HRD', 'ADMIN'] },
   { to: '/setup', label: 'Status', icon: CircleCheck },
 ];
 
@@ -29,6 +32,7 @@ export default function AppShell() {
   const { user, logout } = useAuth();
   const { theme, toggle } = useTheme();
   const ThemeIcon = theme === 'dark' ? Sun : Moon;
+  const items = NAV.filter((i) => !i.roles || (user !== null && i.roles.includes(user.role)));
 
   return (
     <div className="min-h-screen md:pl-60">
@@ -39,7 +43,7 @@ export default function AppShell() {
           <p className="text-caption text-muted">Sistem absensi pabrik</p>
         </div>
         <nav className="flex flex-1 flex-col gap-1" aria-label="Menu utama">
-          {NAV.map(({ to, label, icon: Icon }) => (
+          {items.map(({ to, label, icon: Icon }) => (
             <NavLink
               key={to}
               to={to}
@@ -58,7 +62,7 @@ export default function AppShell() {
           <div className="px-2">
             <p className="truncate font-semibold">{user?.nama}</p>
             <p className="truncate text-caption text-muted">
-              {user?.nik} · {ROLE_LABEL[user?.role ?? ''] ?? user?.role} · {user?.department.nama}
+              {user?.nik} {'\u00B7'} {ROLE_LABEL[user?.role ?? ''] ?? user?.role} {'\u00B7'} {user?.department.nama}
             </p>
           </div>
           <div className="flex gap-2">
@@ -77,7 +81,7 @@ export default function AppShell() {
         <div className="min-w-0">
           <p className="truncate font-bold">{user?.nama}</p>
           <p className="truncate text-caption text-muted">
-            {user?.nik} · {ROLE_LABEL[user?.role ?? ''] ?? user?.role}
+            {user?.nik} {'\u00B7'} {ROLE_LABEL[user?.role ?? ''] ?? user?.role}
           </p>
         </div>
         <div className="flex gap-2">
@@ -101,7 +105,7 @@ export default function AppShell() {
         className="fixed inset-x-0 bottom-0 z-20 flex border-t border-border bg-surface md:hidden"
         style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
       >
-        {NAV.map(({ to, label, icon: Icon }) => (
+        {items.map(({ to, label, icon: Icon }) => (
           <NavLink
             key={to}
             to={to}
