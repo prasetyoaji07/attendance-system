@@ -5,6 +5,7 @@ import RequireRole from '@/components/RequireRole';
 import { useAuth } from '@/lib/auth';
 import Devices from '@/pages/Devices';
 import Home from '@/pages/Home';
+import LocationQr from '@/pages/LocationQr';
 import Login from '@/pages/Login';
 import Schedule from '@/pages/Schedule';
 
@@ -34,6 +35,14 @@ export default function App() {
           element={
             <RequireRole roles={['HRD', 'ADMIN']}>
               <Devices />
+            </RequireRole>
+          }
+        />
+        <Route
+          path="/qr-lokasi"
+          element={
+            <RequireRole roles={['HRD', 'ADMIN']}>
+              <LocationQr />
             </RequireRole>
           }
         />

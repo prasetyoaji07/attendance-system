@@ -1,4 +1,4 @@
-import { CalendarDays, CircleCheck, LogOut, Moon, Smartphone, Sun, type LucideIcon } from 'lucide-react';
+import { CalendarDays, CircleCheck, LogOut, Moon, QrCode, Smartphone, Sun, type LucideIcon } from 'lucide-react';
 import { NavLink, Outlet } from 'react-router-dom';
 import DeviceBanner from '@/components/DeviceBanner';
 import { Button } from '@/components/ui/Button';
@@ -17,6 +17,7 @@ interface NavItem {
 const NAV: NavItem[] = [
   { to: '/jadwal', label: 'Jadwal', icon: CalendarDays },
   { to: '/perangkat', label: 'Perangkat', icon: Smartphone, roles: ['HRD', 'ADMIN'] },
+  { to: '/qr-lokasi', label: 'QR Lokasi', icon: QrCode, roles: ['HRD', 'ADMIN'] },
   { to: '/setup', label: 'Status', icon: CircleCheck },
 ];
 
@@ -62,7 +63,7 @@ export default function AppShell() {
           <div className="px-2">
             <p className="truncate font-semibold">{user?.nama}</p>
             <p className="truncate text-caption text-muted">
-              {user?.nik} {'\u00B7'} {ROLE_LABEL[user?.role ?? ''] ?? user?.role} {'\u00B7'} {user?.department.nama}
+              {user?.nik} {'·'} {ROLE_LABEL[user?.role ?? ''] ?? user?.role} {'·'} {user?.department.nama}
             </p>
           </div>
           <div className="flex gap-2">
@@ -81,7 +82,7 @@ export default function AppShell() {
         <div className="min-w-0">
           <p className="truncate font-bold">{user?.nama}</p>
           <p className="truncate text-caption text-muted">
-            {user?.nik} {'\u00B7'} {ROLE_LABEL[user?.role ?? ''] ?? user?.role}
+            {user?.nik} {'·'} {ROLE_LABEL[user?.role ?? ''] ?? user?.role}
           </p>
         </div>
         <div className="flex gap-2">
