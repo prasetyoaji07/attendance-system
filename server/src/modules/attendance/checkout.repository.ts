@@ -60,9 +60,9 @@ export const checkOutRepository: CheckOutRepository = {
     // Syarat di WHERE membuat UPDATE ini aman dari dua request bersamaan dan dari auto-close yang menyalip.
     const [res] = await dbOf(tx).execute<ResultSetHeader>(
       `UPDATE attendance
-          SET check_out_at = ?, lat_out = ?, lng_out = ?, early_leave_minutes = ?, status = ?
+          SET check_out_at = ?, lat_out = ?, lng_out = ?, early_leave_minutes = ?, early_leave_reason = ?, status = ?
         WHERE id = ? AND check_out_at IS NULL AND auto_closed = 0`,
-      [d.checkOutAt, d.lat, d.lng, d.earlyLeaveMinutes, d.status, d.attendanceId],
+      [d.checkOutAt, d.lat, d.lng, d.earlyLeaveMinutes, d.earlyLeaveReason, d.status, d.attendanceId],
     );
     return res.affectedRows === 1;
   },

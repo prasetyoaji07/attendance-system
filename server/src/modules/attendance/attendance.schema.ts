@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { EARLY_LEAVE_REASONS } from '../../core/early-leave-reasons';
 
 /** Body POST /attendance/check-in. Koordinat dan akurasi dari Geolocation API, `qr` dari hasil scan layar lokasi. */
 export const checkInSchema = z.object({
@@ -10,6 +11,12 @@ export const checkInSchema = z.object({
 });
 export type CheckInInput = z.infer<typeof checkInSchema>;
 
-/** Body POST /attendance/check-out: sama dengan check-in (kehadiran di lokasi dibuktikan lagi saat pulang). */
-export const checkOutSchema = checkInSchema;
+/**
+ * Body POST /attendance/check-out: sama dengan check-in (kehadiran di lokasi dibuktikan lagi saat pulang)
+ * ditambah `earlyLeaveReason` (kode dropdown, tanpa teks bebas). Wajib-tidaknya diputuskan server dari jam server
+ * (service): wajib jika sekarang belum jam selesai shift; jika sudah jam selesai, alasan diabaikan.
+ */
+export const checkOutSchema = checkInSchema.extend({
+  earlyLeaveReason: z.enum(EARLY_LEAVE_REASONS).optional(),
+});
 export type CheckOutInput = z.infer<typeof checkOutSchema>;

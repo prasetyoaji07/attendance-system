@@ -6,16 +6,22 @@
  * supaya shift malam yang lewat tengah malam tetap menempel ke roster tanggal mulainya.
  *
  * Urutan: absen terakhir -> sudah check-out? -> masih dalam batas waktu? -> akurasi GPS -> jarak -> QR
- *         -> hitung pulang cepat + status -> simpan.
+ *         -> alasan pulang awal (jika belum jam selesai) -> hitung pulang cepat + status -> simpan.
  * Batas waktu = selesai shift + RULES.checkinWindowHoursAfter. Lewat itu, absen perlu koreksi lewat HRD.
+ *
+ * Alasan pulang awal (C0b): server yang memutuskan dari jam server. Sekarang < jam selesai shift persis
+ * (isBeforeShiftEnd, sama dengan `checkOut.early` di GET /attendance/today) -> alasan WAJIB. Sudah jam selesai
+ * atau lewat -> alasan yang dikirim diabaikan (disimpan null). Alasan tidak mengubah status; PULANG_CEPAT
+ * tetap dari computeDailyStatus (selesai dikurangi toleransi).
  */
 import { AppError } from '../../core/errors';
+import type { EarlyLeaveReason } from '../../core/early-leave-reasons';
 import type { AuthUser } from '../../core/middleware/auth';
 import type { AttendanceStatus } from '../../core/roles';
 import type { TxRunner } from '../../core/service-deps';
 import { isPastCloseDeadline } from '../../utils/auto-close';
 import { computeDailyStatus } from '../../utils/daily-status';
-import { buildShiftWindow, type ShiftDef } from '../../utils/shift-time';
+import { buildShiftWindow, isBeforeShiftEnd, type ShiftDef } from '../../utils/shift-time';
 import type { CheckOutInput } from './attendance.schema';
 import { assertPresence, type PresenceLocation } from './presence';
 
@@ -41,6 +47,8 @@ export interface NewCheckOut {
   lat: number;
   lng: number;
   earlyLeaveMinutes: number;
+  /** Null jika check-out tidak sebelum jam selesai shift. */
+  earlyLeaveReason: EarlyLeaveReason | null;
   status: AttendanceStatus;
 }
 
@@ -74,6 +82,8 @@ export interface CheckOutResult {
   status: AttendanceStatus;
   lateMinutes: number;
   earlyLeaveMinutes: number;
+  /** Alasan yang tersimpan; null jika check-out tidak sebelum jam selesai shift. */
+  earlyLeaveReason: EarlyLeaveReason | null;
   workedMinutes: number;
   distanceM: number;
   message: string;
@@ -114,7 +124,18 @@ export function createCheckOutService(deps: CheckOutDeps) {
       // 4-6) Akurasi GPS, jarak ke lokasi, dan QR dinamis (sama dengan check-in).
       const { distanceM } = assertPresence(input, latest.location, now, { secret: qrSecret, ttlSeconds: qrTtlSeconds });
 
-      // 7) Pulang cepat dan status dari satu fungsi yang sama dengan check-in dan penutupan harian.
+      // 7) Alasan pulang awal: wajib jika sekarang belum jam selesai shift; kalau sudah, alasan yang dikirim diabaikan.
+      const beforeEnd = isBeforeShiftEnd(now, window);
+      if (beforeEnd && !input.earlyLeaveReason) {
+        throw new AppError(
+          422,
+          'EARLY_LEAVE_REASON_REQUIRED',
+          `Kamu pulang sebelum jam selesai shift (${wibTimeOf(window.endsAt)}). Pilih alasan pulang lebih awal dulu ya.`,
+        );
+      }
+      const earlyLeaveReason: EarlyLeaveReason | null = beforeEnd ? (input.earlyLeaveReason ?? null) : null;
+
+      // 8) Pulang cepat dan status dari satu fungsi yang sama dengan check-in dan penutupan harian.
       const daily = computeDailyStatus({
         now,
         window,
@@ -123,7 +144,7 @@ export function createCheckOutService(deps: CheckOutDeps) {
       });
       const status = daily.status ?? 'HADIR';
 
-      // 8) Simpan. Kondisi di UPDATE menangkap dua request bersamaan atau auto-close yang menyalip.
+      // 9) Simpan. Kondisi di UPDATE menangkap dua request bersamaan atau auto-close yang menyalip.
       const updated = await runInTransaction((tx) =>
         repo.updateCheckOut(
           {
@@ -132,6 +153,7 @@ export function createCheckOutService(deps: CheckOutDeps) {
             lat: input.lat,
             lng: input.lng,
             earlyLeaveMinutes: daily.earlyLeaveMinutes,
+            earlyLeaveReason,
             status,
           },
           tx,
@@ -153,6 +175,7 @@ export function createCheckOutService(deps: CheckOutDeps) {
         status,
         lateMinutes: daily.lateMinutes,
         earlyLeaveMinutes: daily.earlyLeaveMinutes,
+        earlyLeaveReason,
         workedMinutes: Math.floor((now.getTime() - latest.checkInAt.getTime()) / 60_000),
         distanceM: Math.round(distanceM),
         message:

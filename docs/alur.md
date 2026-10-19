@@ -220,6 +220,8 @@ flowchart TD
 - Yang dicari adalah absen terakhir karyawan (`check_in_at` terbaru), bukan lewat jendela roster, supaya shift malam tetap menempel ke tanggal mulainya.
 - Batas akhir check-out = jam selesai shift + `RULES.checkinWindowHoursAfter` (2 jam). Tepat di batas masih boleh.
 - Absen yang punya check-in tanpa check-out dan sudah lewat batas ditutup otomatis (cron tiap 15 menit, hanya jika `RUN_JOBS=true`): `auto_closed=1` dan `needs_correction=1`. `check_out_at` dibiarkan kosong karena jam pulang tidak boleh dikarang. Koreksinya lewat pengajuan ke HRD (Fase 3). Proses ini idempoten dan tercatat di audit log.
+- **Alasan pulang awal:** check-out sebelum jam selesai shift persis (`isBeforeShiftEnd`, sama dengan `checkOut.early` di `/attendance/today`) wajib menyertakan `earlyLeaveReason` (dropdown 5 kode, tanpa teks bebas). Jam server yang menentukan, bukan client. Diperiksa setelah GPS dan QR. Sudah jam selesai atau lewat: alasan diabaikan. Disimpan di `attendance.early_leave_reason` (nullable). Alasan tidak mengubah status; PULANG_CEPAT tetap selesai dikurangi toleransi, jadi pulang di rentang toleransi wajib alasan tetapi status `HADIR`. `SAKIT_KECELAKAAN` hanya disimpan, **bukan sistem tanggap darurat**.
+- **Lembur** tidak dihitung otomatis dari belum check-out. Sistem tidak mengisi check-out otomatis di jam selesai (jam pulang tidak boleh dikarang); absen yang lupa check-out ditutup otomatis dan dikoreksi lewat HRD.
 - Penutupan harian untuk status ALPA, LIBUR, dan cuti (`jobs/daily-close.ts`) tetap di Fase 4.
 
 **Status Beranda** (`GET /attendance/today`, `utils/today-state.ts`, pure): memakai jendela roster yang sama dengan check-in dan batas yang sama dengan check-out. Hanya membaca. Detail status dan prioritas ada di `docs/api.md`.

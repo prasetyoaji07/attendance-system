@@ -145,12 +145,15 @@ Keduanya wajib header `X-Device-Id` (lihat bagian Devices untuk kode 403).
 
 ### Check-out
 
-`POST /attendance/check-out` body: `{ lat, lng, accuracyM, qr }` (sama dengan check-in)
+`POST /attendance/check-out` body: `{ lat, lng, accuracyM, qr, earlyLeaveReason? }` (empat field pertama sama dengan check-in)
 - **Absen yang dicari** adalah ABSEN TERAKHIR karyawan (`check_in_at` terbaru), bukan lewat jendela roster. Dengan begini shift malam yang lewat tengah malam tetap menempel ke roster tanggal mulainya.
+- **Alasan pulang awal (`earlyLeaveReason`)**: kode dropdown, tanpa teks bebas: `SAKIT_KECELAKAAN` ("Sakit / kecelakaan kerja"), `URUSAN_KELUARGA` ("Urusan keluarga mendesak"), `DISURUH_ATASAN` ("Disuruh atasan pulang"), `KERJAAN_SELESAI` ("Pekerjaan sudah selesai"), `LAINNYA` ("Lainnya"). Daftar ada di `server/src/core/early-leave-reasons.ts`. Server yang memutuskan dari jam server: jika sekarang **sebelum jam selesai shift persis** (`isBeforeShiftEnd`, sama dengan `checkOut.early` di `GET /attendance/today`) alasan **wajib**, jika tidak ada: `422 EARLY_LEAVE_REASON_REQUIRED`. Jika sudah jam selesai atau lewat, alasan yang dikirim **diabaikan** (disimpan `null`, respons `earlyLeaveReason: null`). Kode di luar daftar ditolak `400 VALIDATION_ERROR`. Disimpan di kolom `attendance.early_leave_reason` (nullable, migrasi 004; baris lama `NULL`).
+- Alasan **tidak mengubah status**. Wajib alasan (sebelum selesai) beda tipis dari `PULANG_CEPAT` (sebelum selesai dikurangi toleransi): pulang di rentang toleransi, mis. 13:57 untuk shift selesai 14:00, wajib alasan tetapi status tetap `HADIR` dan `earlyLeaveMinutes` 0. Rekap memakai `status` untuk menghitung pulang cepat.
+- `SAKIT_KECELAKAAN` hanya disimpan. Ini **bukan sistem tanggap darurat**; flag/notifikasi menyusul (Fase 3/5).
 - **Batas akhir check-out** = jam selesai shift + `RULES.checkinWindowHoursAfter` (2 jam). Tepat di batas masih boleh (inklusif).
-- Urutan pemeriksaan: JWT, perangkat, absen terakhir, sudah check-out, batas waktu, akurasi GPS, jarak, QR, hitung, lalu simpan. Pemeriksaan GPS, jarak, dan QR sama dengan check-in.
+- Urutan pemeriksaan: JWT, perangkat, absen terakhir, sudah check-out, batas waktu, akurasi GPS, jarak, QR, alasan pulang awal, hitung, lalu simpan. Pemeriksaan GPS, jarak, dan QR sama dengan check-in. Alasan diperiksa setelah GPS/QR, jadi client menampilkan dropdown alasan **sebelum** scan QR (QR hanya berlaku 45 detik).
 - Status dari `computeDailyStatus`: `TELAT` > `PULANG_CEPAT` > `HADIR`. Pulang cepat = check-out sebelum jam selesai - toleransi shift. `lateMinutes` dan `earlyLeaveMinutes` dilaporkan terpisah. Jarak dan akurasi saat check-out tidak disimpan.
-- Sukses: `200` `{ data: { attendanceId, rosterId, shiftDate, shiftNama, locationNama, checkInAt (ISO UTC), checkOutAt (ISO UTC), status, lateMinutes, earlyLeaveMinutes, workedMinutes, distanceM, message } }`. Contoh `message`: `Check-out 13:40, pulang 15 menit lebih awal`, atau `Check-out 14:02` jika tidak pulang cepat.
+- Sukses: `200` `{ data: { attendanceId, rosterId, shiftDate, shiftNama, locationNama, checkInAt (ISO UTC), checkOutAt (ISO UTC), status, lateMinutes, earlyLeaveMinutes, earlyLeaveReason (kode atau `null`), workedMinutes, distanceM, message } }`. Contoh `message`: `Check-out 13:40, pulang 15 menit lebih awal`, atau `Check-out 14:02` jika tidak pulang cepat.
 - UPDATE hanya mengenai baris yang masih terbuka (`check_out_at` kosong dan belum auto-close). Dua request bersamaan, atau auto-close yang menyalip, berakhir `409`.
 
 ### Status hari ini
@@ -183,6 +186,7 @@ Prioritas: `CHECKED_IN`, lalu jadwal yang jendelanya aktif, lalu `CHECKED_OUT` h
 | 422 | `CHECKOUT_WINDOW_CLOSED` | batas waktu check-out lewat, atau absen sudah ditutup otomatis. Pesan: ajukan koreksi absen ke HRD |
 | 422 | `GPS_ACCURACY_LOW` | sama dengan check-in |
 | 422 | `OUT_OF_RADIUS` | sama dengan check-in |
+| 422 | `EARLY_LEAVE_REASON_REQUIRED` | check-out sebelum jam selesai shift tanpa `earlyLeaveReason`. Pesan menyebut jam selesai (WIB). Tanpa `details` |
 
 
 ### Penutupan otomatis (tanpa endpoint)

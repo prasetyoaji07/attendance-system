@@ -16,7 +16,7 @@
 import type { AttendanceStatus } from '../core/roles';
 import { RULES } from '../core/rules';
 import { closeDeadline, isPastCloseDeadline } from './auto-close';
-import { buildShiftWindow, pickActiveRoster, type RosterWindow, type ShiftDef } from './shift-time';
+import { buildShiftWindow, isBeforeShiftEnd, pickActiveRoster, type RosterWindow, type ShiftDef } from './shift-time';
 
 const WIB_OFFSET_MS = 7 * 3_600_000;
 const MS_HOUR = 3_600_000;
@@ -111,7 +111,7 @@ function build(now: Date, status: TodayStatus, it: Item | null): TodayResult {
     },
     window: { opensAt: new Date(w.startsAt.getTime() - RULES.checkinWindowHoursBefore * MS_HOUR).toISOString(), closesAt: deadlineAt },
     canCheckIn: status === 'NOT_CHECKED_IN',
-    checkOut: status === 'CHECKED_IN' ? { allowed: true, early: now.getTime() < w.endsAt.getTime(), deadlineAt } : null,
+    checkOut: status === 'CHECKED_IN' ? { allowed: true, early: isBeforeShiftEnd(now, w), deadlineAt } : null,
     attendance: att
       ? {
           attendanceId: att.attendanceId,

@@ -27,6 +27,7 @@ Centang saat selesai. Urutan penting: fase berikutnya bergantung pada fase sebel
 - [x] Device binding (daftar, pending, approval ganti device): `/devices/*` + guard header `X-Device-Id` di check-in/check-out (migrasi 003). Terbukti lewat HTTP + TiDB asli (`scripts/try-devices.ts`, 30 pemeriksaan). Belum dicoba: check-in sungguhan dengan header perangkat pada shift aktif, dan pengecekan baris `audit_logs` aksi `DEVICE_*`
 - [x] Client: daftar perangkat setelah login (UUID acak di localStorage, kirim header `X-Device-Id`) + halaman antrean persetujuan perangkat untuk HRD/ADMIN. Terbukti di browser + TiDB asli: antrean, setujui, tolak, dialog di HP dan desktop, state kosong, tombol Setujui nonaktif untuk perangkat HRD sendiri, menu Perangkat tersembunyi untuk karyawan. Belum terbukti: ID perangkat tetap sama setelah ganti akun, banner "Perangkat belum terdaftar", skeleton dan error halaman Perangkat, dialog mode terang, route /perangkat diblokir untuk karyawan, pesan 403/404/409
 - [x] Endpoint `GET /attendance/today` (C0): status Beranda (NO_SCHEDULE, UPCOMING, NOT_CHECKED_IN, CHECKED_IN, CHECKED_OUT, AUTO_CLOSED) dari jendela roster yang sama dengan check-in. Lolos tes dan typecheck. Terbukti lewat HTTP + TiDB asli (`scripts/try-today.ts`, 9 pemeriksaan) untuk 401 dan status UPCOMING. Belum terbukti dengan data asli: NOT_CHECKED_IN, CHECKED_IN, CHECKED_OUT, AUTO_CLOSED (tercakup tes unit)
+- [x] C0b: check-out wajib alasan jika pulang sebelum jam selesai (`earlyLeaveReason`, 5 kode dropdown, kolom `attendance.early_leave_reason`, migrasi 004). Ditulis; belum lolos typecheck/tes dan belum terbukti lewat HTTP + TiDB asli sampai hasilnya ditempel. Client (dropdown sebelum scan QR) menyusul di C1
 - [ ] Client: komponen `AttendanceButton` (tombol Absen 3D, 4 state) + chip jarak/akurasi
 - [ ] Client: scan QR (kamera) + Geolocation API
 - [ ] Beranda Karyawan (referensi visual halaman lain)
@@ -36,6 +37,8 @@ Centang saat selesai. Urutan penting: fase berikutnya bergantung pada fase sebel
 - [ ] Cuti: validasi saldo, bentrok roster, kuota divisi; potong saldo saat APPROVED
 - [ ] Izin, sakit, tukar shift, koreksi absen (pakai engine yang sama; antrean koreksi untuk absen `needs_correction`)
 - [ ] Lembur: pengajuan + hitung irisan jam + pengali dari tabel aturan
+- [ ] Batas check-out saat lembur disetujui harus ikut jam lembur (sekarang selesai shift + 2 jam), kalau tidak orang ditutup otomatis di tengah lembur. Lembur tidak dihitung otomatis dari belum check-out
+- [ ] `SAKIT_KECELAKAAN` (alasan pulang awal) memicu flag/notifikasi (Fase 3/5). Bukan sistem tanggap darurat
 - [ ] Client: form pengajuan, timeline approval, halaman approval untuk Foreman/SPV/HRD
 
 ## Fase 4: Cron dan Payroll

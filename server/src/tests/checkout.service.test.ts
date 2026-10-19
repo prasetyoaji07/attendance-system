@@ -7,6 +7,7 @@ import {
   type CheckOutRepository,
   type NewCheckOut,
 } from '../modules/attendance/checkout.service';
+import { EARLY_LEAVE_REASONS } from '../core/early-leave-reasons';
 import { signQr } from '../utils/hmac-qr';
 
 const SECRET = 'x'.repeat(32);
@@ -95,7 +96,7 @@ describe('check-out: hasil normal', () => {
 
   it('pulang cepat: 12:00 untuk shift selesai 14:00 (toleransi 5) = 115 menit, status PULANG_CEPAT', async () => {
     const t = setup({ latest: attendance(), now: '2026-10-18T12:00:00' });
-    const r = await t.service.checkOut(t.body(), user);
+    const r = await t.service.checkOut(t.body({ earlyLeaveReason: 'LAINNYA' }), user);
     expect(r.status).toBe('PULANG_CEPAT');
     expect(r.earlyLeaveMinutes).toBe(115);
     expect(r.message).toContain('115 menit lebih awal');
@@ -105,7 +106,7 @@ describe('check-out: hasil normal', () => {
   it('dalam toleransi bukan pulang cepat: 13:55 tepat dan 13:56 sama-sama HADIR', async () => {
     for (const jam of ['13:55:00', '13:56:00']) {
       const t = setup({ latest: attendance(), now: `2026-10-18T${jam}` });
-      const r = await t.service.checkOut(t.body(), user);
+      const r = await t.service.checkOut(t.body({ earlyLeaveReason: 'LAINNYA' }), user);
       expect(r.earlyLeaveMinutes).toBe(0);
       expect(r.status).toBe('HADIR');
     }
@@ -113,12 +114,12 @@ describe('check-out: hasil normal', () => {
 
   it('13:54 sudah pulang cepat 1 menit', async () => {
     const t = setup({ latest: attendance(), now: '2026-10-18T13:54:00' });
-    expect((await t.service.checkOut(t.body(), user)).earlyLeaveMinutes).toBe(1);
+    expect((await t.service.checkOut(t.body({ earlyLeaveReason: 'LAINNYA' }), user)).earlyLeaveMinutes).toBe(1);
   });
 
   it('telat lalu pulang cepat: status tetap TELAT (prioritas), kedua menit dilaporkan', async () => {
     const t = setup({ latest: attendance({ checkInAt: wib('2026-10-18T06:20:00') }), now: '2026-10-18T12:00:00' });
-    const r = await t.service.checkOut(t.body(), user);
+    const r = await t.service.checkOut(t.body({ earlyLeaveReason: 'LAINNYA' }), user);
     expect(r.status).toBe('TELAT');
     expect(r.lateMinutes).toBe(15);
     expect(r.earlyLeaveMinutes).toBe(115);
@@ -141,7 +142,7 @@ describe('check-out: hasil normal', () => {
   it('shift malam pulang jam 02:00: pulang cepat dihitung dari 05:55 = 235 menit', async () => {
     const latest = attendance({ shift: MALAM, shiftNama: 'Malam', checkInAt: wib('2026-10-18T22:00:00') });
     const t = setup({ latest, now: '2026-10-19T02:00:00' });
-    const r = await t.service.checkOut(t.body(), user);
+    const r = await t.service.checkOut(t.body({ earlyLeaveReason: 'LAINNYA' }), user);
     expect(r.earlyLeaveMinutes).toBe(235);
     expect(r.status).toBe('PULANG_CEPAT');
   });
@@ -210,7 +211,7 @@ describe('check-out: validasi lokasi dan QR (sama dengan check-in)', () => {
 
   it('dalam radius (sekitar 55 m dari titik) diterima', async () => {
     const t = setup({ latest: attendance(), now: at });
-    const r = await t.service.checkOut(t.body({ lat: -6.2005 }), user);
+    const r = await t.service.checkOut(t.body({ lat: -6.2005, earlyLeaveReason: 'LAINNYA' }), user);
     expect(r.distanceM).toBeGreaterThan(40);
     expect(r.distanceM).toBeLessThan(70);
   });
@@ -247,6 +248,96 @@ describe('check-out: validasi lokasi dan QR (sama dengan check-in)', () => {
 describe('check-out: balapan', () => {
   it('UPDATE tidak mengenai baris (keburu check-out/auto-close): 409 CONFLICT', async () => {
     const t = setup({ latest: attendance(), now: '2026-10-18T13:00:00', updateResult: false });
-    await expectError(t.service.checkOut(t.body(), user), 409, 'CONFLICT');
+    await expectError(t.service.checkOut(t.body({ earlyLeaveReason: 'LAINNYA' }), user), 409, 'CONFLICT');
+  });
+});
+
+describe('check-out: alasan pulang sebelum jam selesai (C0b)', () => {
+  it('pulang sebelum jam selesai tanpa alasan: 422 EARLY_LEAVE_REASON_REQUIRED dan tidak ada yang ditulis', async () => {
+    const t = setup({ latest: attendance(), now: '2026-10-18T13:00:00' });
+    const err = await expectError(t.service.checkOut(t.body(), user), 422, 'EARLY_LEAVE_REASON_REQUIRED');
+    expect(err.message).toContain('14:00');
+    expect(err.message).toContain('alasan');
+    expect(t.updates).toHaveLength(0);
+  });
+
+  it('batas persis: 13:59:59 wajib alasan, 14:00:00 tidak wajib', async () => {
+    const early = setup({ latest: attendance(), now: '2026-10-18T13:59:59' });
+    await expectError(early.service.checkOut(early.body(), user), 422, 'EARLY_LEAVE_REASON_REQUIRED');
+
+    const onTime = setup({ latest: attendance(), now: '2026-10-18T14:00:00' });
+    const r = await onTime.service.checkOut(onTime.body(), user);
+    expect(r.earlyLeaveReason).toBeNull();
+  });
+
+  it('alasan valid: tersimpan di data dan dikembalikan di respons', async () => {
+    const t = setup({ latest: attendance(), now: '2026-10-18T12:00:00' });
+    const r = await t.service.checkOut(t.body({ earlyLeaveReason: 'DISURUH_ATASAN' }), user);
+    expect(r.earlyLeaveReason).toBe('DISURUH_ATASAN');
+    expect(t.updates[0].earlyLeaveReason).toBe('DISURUH_ATASAN');
+  });
+
+  it('kelima kode alasan diterima dan tersimpan apa adanya', async () => {
+    for (const kode of EARLY_LEAVE_REASONS) {
+      const t = setup({ latest: attendance(), now: '2026-10-18T12:00:00' });
+      const r = await t.service.checkOut(t.body({ earlyLeaveReason: kode }), user);
+      expect(r.earlyLeaveReason).toBe(kode);
+      expect(t.updates[0].earlyLeaveReason).toBe(kode);
+    }
+  });
+
+  it('dalam toleransi (13:57): tetap wajib alasan, tapi status HADIR dan pulang cepat 0', async () => {
+    const noReason = setup({ latest: attendance(), now: '2026-10-18T13:57:00' });
+    await expectError(noReason.service.checkOut(noReason.body(), user), 422, 'EARLY_LEAVE_REASON_REQUIRED');
+
+    const t = setup({ latest: attendance(), now: '2026-10-18T13:57:00' });
+    const r = await t.service.checkOut(t.body({ earlyLeaveReason: 'URUSAN_KELUARGA' }), user);
+    expect(r.status).toBe('HADIR');
+    expect(r.earlyLeaveMinutes).toBe(0);
+    expect(r.earlyLeaveReason).toBe('URUSAN_KELUARGA');
+  });
+
+  it('alasan dikirim padahal sudah jam selesai: diabaikan, disimpan null', async () => {
+    const t = setup({ latest: attendance(), now: '2026-10-18T14:30:00' });
+    const r = await t.service.checkOut(t.body({ earlyLeaveReason: 'LAINNYA' }), user);
+    expect(r.earlyLeaveReason).toBeNull();
+    expect(t.updates[0].earlyLeaveReason).toBeNull();
+    expect(r.status).toBe('HADIR');
+  });
+
+  it('alasan tidak mengubah status: telat + alasan tetap TELAT', async () => {
+    const t = setup({ latest: attendance({ checkInAt: wib('2026-10-18T06:20:00') }), now: '2026-10-18T12:00:00' });
+    const r = await t.service.checkOut(t.body({ earlyLeaveReason: 'SAKIT_KECELAKAAN' }), user);
+    expect(r.status).toBe('TELAT');
+    expect(r.earlyLeaveReason).toBe('SAKIT_KECELAKAAN');
+  });
+
+  it('shift malam: 02:00 wajib alasan, tepat 06:00 tidak wajib', async () => {
+    const latest = attendance({ shift: MALAM, shiftNama: 'Malam', checkInAt: wib('2026-10-18T22:00:00') });
+    const early = setup({ latest, now: '2026-10-19T02:00:00' });
+    await expectError(early.service.checkOut(early.body(), user), 422, 'EARLY_LEAVE_REASON_REQUIRED');
+
+    const onTime = setup({ latest, now: '2026-10-19T06:00:00' });
+    const r = await onTime.service.checkOut(onTime.body(), user);
+    expect(r.earlyLeaveReason).toBeNull();
+  });
+
+  it('urutan: GPS lemah dan QR rusak menang atas alasan kosong', async () => {
+    const gps = setup({ latest: attendance(), now: '2026-10-18T13:00:00' });
+    await expectError(gps.service.checkOut(gps.body({ accuracyM: 80 }), user), 422, 'GPS_ACCURACY_LOW');
+
+    const qr = setup({ latest: attendance(), now: '2026-10-18T13:00:00' });
+    await expectError(qr.service.checkOut(qr.body({ qr: 'rusak.token.palsu' }), user), 400, 'INVALID_QR');
+  });
+
+  it('urutan: tanpa absen, sudah check-out, atau sudah ditutup otomatis menang atas alasan kosong', async () => {
+    const none = setup({ latest: null, now: '2026-10-18T13:00:00' });
+    await expectError(none.service.checkOut(none.body(), user), 422, 'NO_OPEN_ATTENDANCE');
+
+    const done = setup({ latest: attendance({ checkOutAt: wib('2026-10-18T12:00:00') }), now: '2026-10-18T13:00:00' });
+    await expectError(done.service.checkOut(done.body(), user), 409, 'CONFLICT');
+
+    const closed = setup({ latest: attendance({ autoClosed: true }), now: '2026-10-18T13:00:00' });
+    await expectError(closed.service.checkOut(closed.body(), user), 422, 'CHECKOUT_WINDOW_CLOSED');
   });
 });

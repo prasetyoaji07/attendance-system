@@ -89,6 +89,15 @@ export function pickActiveRoster(now: Date, candidates: RosterWindow[]): RosterW
   return best;
 }
 
+/**
+ * True jika `now` masih SEBELUM jam selesai shift persis (tanpa toleransi). Tepat di jam selesai = false.
+ * Dipakai server untuk mewajibkan alasan pulang awal dan oleh GET /attendance/today (`checkOut.early`),
+ * supaya keduanya tidak bisa berbeda. Beda tipis dari status PULANG_CEPAT (selesai dikurangi toleransi).
+ */
+export function isBeforeShiftEnd(now: Date, window: RosterWindow): boolean {
+  return now.getTime() < window.endsAt.getTime();
+}
+
 /** late = max(0, now - (startsAt + toleransi)) dalam menit bulat (dibulatkan ke bawah). */
 export function calcLateMinutes(checkInAt: Date, window: RosterWindow, toleranceMinutes: number): number {
   const deadline = window.startsAt.getTime() + toleranceMinutes * MS_MINUTE;
