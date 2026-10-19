@@ -117,6 +117,7 @@ Skrip uji: `npx tsx scripts/try-devices.ts` (dari folder `server`; tidak membuat
 
 | Method | Path | Akses | Keterangan |
 |---|---|---|---|
+| GET | `/attendance/today` | login | status Beranda: jadwal yang relevan sekarang dan status absennya (hanya membaca) |
 | POST | `/attendance/check-in` | login + perangkat `active` | check-in untuk roster yang jendelanya sedang terbuka |
 | POST | `/attendance/check-out` | login + perangkat `active` | check-out untuk absen terakhir yang masih terbuka |
 
@@ -152,6 +153,25 @@ Keduanya wajib header `X-Device-Id` (lihat bagian Devices untuk kode 403).
 - Sukses: `200` `{ data: { attendanceId, rosterId, shiftDate, shiftNama, locationNama, checkInAt (ISO UTC), checkOutAt (ISO UTC), status, lateMinutes, earlyLeaveMinutes, workedMinutes, distanceM, message } }`. Contoh `message`: `Check-out 13:40, pulang 15 menit lebih awal`, atau `Check-out 14:02` jika tidak pulang cepat.
 - UPDATE hanya mengenai baris yang masih terbuka (`check_out_at` kosong dan belum auto-close). Dua request bersamaan, atau auto-close yang menyalip, berakhir `409`.
 
+### Status hari ini
+
+`GET /attendance/today` -> `{ data: { serverTime, status, roster, window, canCheckIn, checkOut, attendance } }`
+- Hanya membaca. Tanpa header `X-Device-Id`, tanpa audit log, `Cache-Control: no-store`. Semua role yang login boleh; datanya selalu milik akun yang login (tanpa parameter id).
+- Roster yang diperiksa: tanggal mulai kemarin, hari ini, dan besok, dengan jendela `[mulai - 2 jam, selesai + 2 jam]` yang sama dengan check-in (`pickActiveRoster`). Batas check-out sama dengan `POST /attendance/check-out`.
+
+| `status` | Arti |
+|---|---|
+| `NO_SCHEDULE` | tidak ada jadwal yang relevan. `roster`, `window`, `checkOut`, `attendance` semuanya `null` |
+| `UPCOMING` | jadwal terdekat belum terbuka. `window.opensAt` = kapan boleh absen |
+| `NOT_CHECKED_IN` | jendela terbuka, belum check-in. `canCheckIn` = true |
+| `CHECKED_IN` | sudah masuk, belum pulang. `checkOut` = `{ allowed, early, deadlineAt }`; `early` = sekarang belum jam selesai |
+| `CHECKED_OUT` | sudah pulang. Tampil sepanjang hari WIB (tanggal pulang = hari ini) |
+| `AUTO_CLOSED` | check-in tanpa check-out dan sudah ditutup otomatis atau lewat batas. Perlu koreksi ke HRD |
+
+Prioritas: `CHECKED_IN`, lalu jadwal yang jendelanya aktif, lalu `CHECKED_OUT` hari ini, lalu `AUTO_CLOSED`, lalu `UPCOMING`, lalu `NO_SCHEDULE`. Absen terbuka yang sudah lewat batas dilaporkan `AUTO_CLOSED` walau cron 15 menit belum menandainya. Absen `AUTO_CLOSED` yang lebih tua dari kemarin tidak tampil (antrean koreksi menyusul di Fase 3).
+- `roster` berisi lokasi (`lat`, `lng`, `radiusM`) supaya client bisa menampilkan jarak. `window` dan `attendance` memakai ISO UTC; `attendance.status` bisa `null`.
+- Error: `401 UNAUTHORIZED` tanpa token. Skrip uji: `npx tsx scripts/try-today.ts [NIK]` (dari folder `server`).
+
 | Status | Kode | Arti |
 |---|---|---|
 | 400 | `VALIDATION_ERROR` | body tidak sesuai skema |
@@ -163,6 +183,7 @@ Keduanya wajib header `X-Device-Id` (lihat bagian Devices untuk kode 403).
 | 422 | `CHECKOUT_WINDOW_CLOSED` | batas waktu check-out lewat, atau absen sudah ditutup otomatis. Pesan: ajukan koreksi absen ke HRD |
 | 422 | `GPS_ACCURACY_LOW` | sama dengan check-in |
 | 422 | `OUT_OF_RADIUS` | sama dengan check-in |
+
 
 ### Penutupan otomatis (tanpa endpoint)
 

@@ -222,6 +222,8 @@ flowchart TD
 - Absen yang punya check-in tanpa check-out dan sudah lewat batas ditutup otomatis (cron tiap 15 menit, hanya jika `RUN_JOBS=true`): `auto_closed=1` dan `needs_correction=1`. `check_out_at` dibiarkan kosong karena jam pulang tidak boleh dikarang. Koreksinya lewat pengajuan ke HRD (Fase 3). Proses ini idempoten dan tercatat di audit log.
 - Penutupan harian untuk status ALPA, LIBUR, dan cuti (`jobs/daily-close.ts`) tetap di Fase 4.
 
+**Status Beranda** (`GET /attendance/today`, `utils/today-state.ts`, pure): memakai jendela roster yang sama dengan check-in dan batas yang sama dengan check-out. Hanya membaca. Detail status dan prioritas ada di `docs/api.md`.
+
 ### 7.3 Workflow Approval (contoh: cuti)
 
 ```mermaid

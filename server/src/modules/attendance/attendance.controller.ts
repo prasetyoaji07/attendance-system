@@ -7,11 +7,14 @@ import type { CheckInInput, CheckOutInput } from './attendance.schema';
 import { createAttendanceService } from './attendance.service';
 import { checkOutRepository } from './checkout.repository';
 import { createCheckOutService } from './checkout.service';
+import { todayRepository } from './today.repository';
+import { createTodayService } from './today.service';
 
 const qr = { qrSecret: config.QR_SECRET, qrTtlSeconds: RULES.qrTtlSeconds };
 
 const service = createAttendanceService({ repo: attendanceRepository, ...qr, runInTransaction });
 const checkOutService = createCheckOutService({ repo: checkOutRepository, ...qr, runInTransaction });
+const todayService = createTodayService({ repo: todayRepository });
 
 export async function checkIn(req: Request, res: Response) {
   const result = await service.checkIn(res.locals.body as CheckInInput, req.user!);
@@ -20,5 +23,11 @@ export async function checkIn(req: Request, res: Response) {
 
 export async function checkOut(req: Request, res: Response) {
   const result = await checkOutService.checkOut(res.locals.body as CheckOutInput, req.user!);
+  res.status(200).json({ data: result });
+}
+
+export async function getToday(req: Request, res: Response) {
+  const result = await todayService.getToday(req.user!);
+  res.set('Cache-Control', 'no-store');
   res.status(200).json({ data: result });
 }
