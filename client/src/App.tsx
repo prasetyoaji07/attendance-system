@@ -3,8 +3,8 @@ import type { ReactNode } from 'react';
 import AppShell from '@/components/AppShell';
 import RequireRole from '@/components/RequireRole';
 import { useAuth } from '@/lib/auth';
+import Beranda from '@/pages/Beranda';
 import Devices from '@/pages/Devices';
-import Home from '@/pages/Home';
 import LocationQr from '@/pages/LocationQr';
 import Login from '@/pages/Login';
 import Schedule from '@/pages/Schedule';
@@ -29,6 +29,7 @@ export default function App() {
           </RequireAuth>
         }
       >
+        <Route path="/beranda" element={<Beranda />} />
         <Route path="/jadwal" element={<Schedule />} />
         <Route
           path="/perangkat"
@@ -46,10 +47,9 @@ export default function App() {
             </RequireRole>
           }
         />
-        <Route path="/setup" element={<Home />} />
         {/* TODO: pengajuan, approval, dashboard */}
       </Route>
-      <Route path="*" element={<Navigate to="/jadwal" replace />} />
+      <Route path="*" element={<Navigate to="/beranda" replace />} />
     </Routes>
   );
 }

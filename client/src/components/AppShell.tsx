@@ -1,4 +1,4 @@
-import { CalendarDays, CircleCheck, LogOut, Moon, QrCode, Smartphone, Sun, type LucideIcon } from 'lucide-react';
+import { CalendarDays, House, LogOut, Moon, QrCode, Smartphone, Sun, type LucideIcon } from 'lucide-react';
 import { NavLink, Outlet } from 'react-router-dom';
 import DeviceBanner from '@/components/DeviceBanner';
 import { Button } from '@/components/ui/Button';
@@ -13,12 +13,12 @@ interface NavItem {
   roles?: Role[];
 }
 
-// Tambah item di sini saat halaman baru jadi (Beranda, Pengajuan, Approval, Dashboard).
+// Tambah item di sini saat halaman baru jadi (Pengajuan, Approval, Dashboard).
 const NAV: NavItem[] = [
+  { to: '/beranda', label: 'Beranda', icon: House },
   { to: '/jadwal', label: 'Jadwal', icon: CalendarDays },
   { to: '/perangkat', label: 'Perangkat', icon: Smartphone, roles: ['HRD', 'ADMIN'] },
   { to: '/qr-lokasi', label: 'QR Lokasi', icon: QrCode, roles: ['HRD', 'ADMIN'] },
-  { to: '/setup', label: 'Status', icon: CircleCheck },
 ];
 
 const ROLE_LABEL: Record<string, string> = {
