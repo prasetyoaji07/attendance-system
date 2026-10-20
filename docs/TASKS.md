@@ -41,6 +41,7 @@ Centang saat selesai. Urutan penting: fase berikutnya bergantung pada fase sebel
 - [ ] docs: bagian A (komponen Alert, termasuk tone sukses) di `design.md`; selisih tinggi input (`inputCls` 44 vs design.md 9.4 = 48); log server masih mencetak "[daily-close] TODO" (Fase 4)
 - [ ] Dropdown alasan pulang dan labelnya disalin dari server (`earlyLeave.ts`); kalau server menambah alasan, client harus ikut
 - [x] Hapus `client/src/pages/Home.tsx` (tidak dipakai) lewat `git rm`
+- [x] `RequireRole`: peran yang tidak berhak diarahkan ke `/beranda` (sebelumnya `/jadwal`)
 - [ ] Keputusan bisnis (belum diputuskan): status absen tetap `TELAT` saat telat lalu pulang awal; apakah status "pulang cepat" perlu tampil juga
 
 ### Fase 2b: Absen tanpa QR (selfie) (disetujui secara konsep, SETELAH C2; rincian belum final)

@@ -8,6 +8,6 @@ import { useAuth, type Role } from '@/lib/auth';
  */
 export default function RequireRole({ roles, children }: { roles: Role[]; children: ReactNode }) {
   const { user } = useAuth();
-  if (!user || !roles.includes(user.role)) return <Navigate to="/jadwal" replace />;
+  if (!user || !roles.includes(user.role)) return <Navigate to="/beranda" replace />;
   return <>{children}</>;
 }
