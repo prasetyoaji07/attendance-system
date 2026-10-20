@@ -11,7 +11,7 @@ const base =
   'disabled:opacity-50 disabled:pointer-events-none';
 
 const variants: Record<Variant, string> = {
-  primary: 'bg-contrast-bg text-contrast-text hover:bg-primary-600 hover:text-white',
+  primary: 'bg-contrast-bg text-contrast-text hover:bg-primary-700 hover:text-white',
   secondary: 'bg-surface-2 text-text hover:bg-border',
   ghost: 'text-primary-600 hover:bg-primary-50',
   danger: 'bg-danger text-white hover:brightness-90',
