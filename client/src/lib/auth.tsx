@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { api, getToken, setToken } from '@/lib/api';
+import { ApiError, api, getToken, setToken } from '@/lib/api';
 import { friendlyError } from '@/lib/api-errors';
 import { getDeviceId } from '@/lib/device';
 
@@ -15,7 +15,8 @@ export interface User {
   atasanId: number | null;
 }
 
-type Status = 'loading' | 'authed' | 'guest';
+/** error = token ada tetapi server tidak bisa memastikan sesi (500, jaringan putus). Token dipertahankan, bisa dicoba lagi. */
+type Status = 'loading' | 'authed' | 'guest' | 'error';
 
 /** idle = belum login; checking = sedang didaftarkan; error = pendaftaran gagal (mis. jaringan), bisa dicoba lagi. */
 export interface DeviceInfo {
@@ -26,10 +27,14 @@ export interface DeviceInfo {
 interface AuthValue {
   user: User | null;
   status: Status;
+  /** Pesan ramah saat status 'error'. */
+  sessionError: string | null;
   device: DeviceInfo;
   login(nik: string, password: string): Promise<void>;
   logout(): void;
   retryDevice(): void;
+  /** Ulangi pengecekan sesi setelah status 'error'. */
+  retrySession(): void;
 }
 
 const AuthContext = createContext<AuthValue | null>(null);
@@ -37,6 +42,8 @@ const AuthContext = createContext<AuthValue | null>(null);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [status, setStatus] = useState<Status>(getToken() ? 'loading' : 'guest');
+  const [sessionError, setSessionError] = useState<string | null>(null);
+  const [sessionTry, setSessionTry] = useState(0);
   const [device, setDevice] = useState<DeviceInfo>({ status: 'idle' });
   // Penanda putaran pendaftaran: hasil yang datang terlambat (mis. setelah logout) dibuang.
   const deviceRun = useRef(0);
@@ -57,6 +64,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   // Sesi lama: tanya server siapa pemilik token (data terbaru dari DB), lalu pastikan perangkat terdaftar.
+  // Hanya 401 (token tidak sah / kedaluwarsa) yang menghapus token. Kegagalan lain (500, jaringan putus)
+  // tidak boleh melempar orang ke login: status 'error' dengan tombol coba lagi.
   useEffect(() => {
     if (!getToken()) return;
     let cancelled = false;
@@ -64,18 +73,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .then((r) => {
         if (cancelled) return;
         setUser(r.user);
+        setSessionError(null);
         setStatus('authed');
         void registerDevice();
       })
-      .catch(() => {
+      .catch((err: unknown) => {
         if (cancelled) return;
-        setToken(null);
-        setStatus('guest');
+        if (err instanceof ApiError && err.status === 401) {
+          setToken(null);
+          setStatus('guest');
+        } else {
+          setSessionError(friendlyError(err));
+          setStatus('error');
+        }
       });
     return () => {
       cancelled = true;
     };
-  }, [registerDevice]);
+  }, [registerDevice, sessionTry]);
 
   const login = useCallback(
     async (nik: string, password: string) => {
@@ -85,6 +100,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
       setToken(r.token);
       setUser(r.user);
+      setSessionError(null);
       setStatus('authed');
       void registerDevice();
     },
@@ -95,13 +111,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     deviceRun.current++;
     setToken(null);
     setUser(null);
+    setSessionError(null);
     setStatus('guest');
     setDevice({ status: 'idle' });
   }, []);
 
+  const retrySession = useCallback(() => {
+    setStatus('loading');
+    setSessionTry((n) => n + 1);
+  }, []);
+
   const value = useMemo(
-    () => ({ user, status, device, login, logout, retryDevice: () => void registerDevice() }),
-    [user, status, device, login, logout, registerDevice],
+    () => ({ user, status, sessionError, device, login, logout, retryDevice: () => void registerDevice(), retrySession }),
+    [user, status, sessionError, device, login, logout, registerDevice, retrySession],
   );
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
