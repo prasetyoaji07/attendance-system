@@ -15,18 +15,16 @@ interface Props {
 
 /*
  * design.md 9.2. Pengecualian token (ditulis sengaja):
- * - diameter 168 (HP) / 192 (desktop) ditetapkan design.md, belum ada token ukurannya;
- * - sisi tebal 8 px dan highlight tipis memakai nilai shadow langsung seperti ui/Button.tsx.
+ * - diameter 168 (HP) / 192 (desktop) ditetapkan design.md, belum ada token ukurannya.
  */
-const MUTED = 'bg-surface-2 text-muted shadow-[inset_0_1px_0_rgba(255,255,255,.2),0_8px_0_var(--border)]';
+const MUTED = 'bg-surface-2 text-muted';
 const SKIN: Record<AttendanceButtonState, string> = {
-  ready:
-    'bg-grad-primary text-white shadow-[inset_0_1px_0_rgba(255,255,255,.35),0_8px_0_var(--primary-700),var(--shadow-glow)]',
+  ready: 'bg-primary-500 text-white shadow-glow',
   locating: MUTED,
-  outside: 'bg-danger text-white shadow-[inset_0_1px_0_rgba(255,255,255,.35),0_8px_0_rgba(0,0,0,.3)]',
+  outside: 'bg-danger text-white',
   weak: MUTED,
   sending: MUTED,
-  done: 'bg-success text-white shadow-[inset_0_1px_0_rgba(255,255,255,.35),0_8px_0_rgba(0,0,0,.3)]',
+  done: 'bg-success text-white',
   idle: MUTED,
 };
 
@@ -47,7 +45,7 @@ export function AttendanceButton({ state, label, detail, disabled = false, onCli
         type="button"
         disabled={blocked}
         onClick={onClick}
-        className={`relative z-10 flex h-full w-full select-none flex-col items-center justify-center gap-1 rounded-full px-4 text-center font-semibold transition-all duration-[120ms] ease-out focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-primary-200 disabled:cursor-not-allowed enabled:active:translate-y-[3px] ${SKIN[state]} ${dim}`}
+        className={`relative z-10 flex h-full w-full select-none flex-col items-center justify-center gap-1 rounded-full px-4 text-center font-semibold transition duration-[120ms] ease-out focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-primary-200 disabled:cursor-not-allowed enabled:active:scale-[0.97] ${SKIN[state]} ${dim}`}
       >
         {state === 'locating' || state === 'sending' ? (
           <LoaderCircle size={40} strokeWidth={1.75} className="motion-safe:animate-spin" aria-hidden="true" />
