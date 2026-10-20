@@ -23,14 +23,32 @@ Centang saat selesai. Urutan penting: fase berikutnya bergantung pada fase sebel
 ## Fase 2: Check-in
 - [x] Endpoint `POST /attendance/check-in` sesuai flow alur.md 7.1
 - [x] Check-out + auto-close (`POST /attendance/check-out`, `jobs/auto-close.ts`; cron 15 menit: kode ada, tick nyata di server belum terbukti)
-- [x] Endpoint QR dinamis per lokasi: `GET /locations/:id/qr` (HRD/ADMIN). Halaman layar yang menampilkannya menyusul bersama item client
-- [x] Device binding (daftar, pending, approval ganti device): `/devices/*` + guard header `X-Device-Id` di check-in/check-out (migrasi 003). Terbukti lewat HTTP + TiDB asli (`scripts/try-devices.ts`, 30 pemeriksaan). Belum dicoba: check-in sungguhan dengan header perangkat pada shift aktif, dan pengecekan baris `audit_logs` aksi `DEVICE_*`
+- [x] Endpoint QR dinamis per lokasi: `GET /locations/:id/qr` (HRD/ADMIN). Halaman layarnya ada di item client "QR Lokasi" di bawah
+- [x] Device binding (daftar, pending, approval ganti device): `/devices/*` + guard header `X-Device-Id` di check-in/check-out (migrasi 003). Terbukti lewat HTTP + TiDB asli (`scripts/try-devices.ts`, 30 pemeriksaan). Check-in sungguhan dengan header perangkat pada shift aktif sudah terbukti lewat layar (lihat item scan QR). Belum dicoba: pengecekan baris `audit_logs` aksi `DEVICE_*`
 - [x] Client: daftar perangkat setelah login (UUID acak di localStorage, kirim header `X-Device-Id`) + halaman antrean persetujuan perangkat untuk HRD/ADMIN. Terbukti di browser + TiDB asli: antrean, setujui, tolak, dialog di HP dan desktop, state kosong, tombol Setujui nonaktif untuk perangkat HRD sendiri, menu Perangkat tersembunyi untuk karyawan. Belum terbukti: ID perangkat tetap sama setelah ganti akun, banner "Perangkat belum terdaftar", skeleton dan error halaman Perangkat, dialog mode terang, route /perangkat diblokir untuk karyawan, pesan 403/404/409
-- [x] Endpoint `GET /attendance/today` (C0): status Beranda (NO_SCHEDULE, UPCOMING, NOT_CHECKED_IN, CHECKED_IN, CHECKED_OUT, AUTO_CLOSED) dari jendela roster yang sama dengan check-in. Lolos tes dan typecheck. Terbukti lewat HTTP + TiDB asli (`scripts/try-today.ts`, 9 pemeriksaan) untuk 401 dan status UPCOMING. Belum terbukti dengan data asli: NOT_CHECKED_IN, CHECKED_IN, CHECKED_OUT, AUTO_CLOSED (tercakup tes unit)
-- [x] C0b: check-out wajib alasan jika pulang sebelum jam selesai (`earlyLeaveReason`, 5 kode dropdown, kolom `attendance.early_leave_reason`, migrasi 004). Ditulis; belum lolos typecheck/tes dan belum terbukti lewat HTTP + TiDB asli sampai hasilnya ditempel. Client (dropdown sebelum scan QR) menyusul di C1
-- [ ] Client: komponen `AttendanceButton` (tombol Absen 3D, 4 state) + chip jarak/akurasi
-- [ ] Client: scan QR (kamera) + Geolocation API
-- [ ] Beranda Karyawan (referensi visual halaman lain)
+- [x] Endpoint `GET /attendance/today` (C0): status Beranda (NO_SCHEDULE, UPCOMING, NOT_CHECKED_IN, CHECKED_IN, CHECKED_OUT, AUTO_CLOSED) dari jendela roster yang sama dengan check-in. Lolos tes dan typecheck. Terbukti lewat HTTP + TiDB asli (`scripts/try-today.ts`, 9 pemeriksaan) untuk 401 dan status UPCOMING. Lewat layar dengan data asli juga terbukti NOT_CHECKED_IN, CHECKED_IN, CHECKED_OUT. Belum terbukti dengan data asli: NO_SCHEDULE dan AUTO_CLOSED (tercakup tes unit)
+- [x] C0b: check-out wajib alasan jika pulang sebelum jam selesai (`earlyLeaveReason`, 5 kode dropdown, kolom `attendance.early_leave_reason`, migrasi 004). Lolos typecheck dan tes. Terbukti lewat layar + TiDB asli: check-out SIM0014 dengan alasan URUSAN_KELUARGA, `early_leave_minutes` 428, alasan tersimpan (dibaca dengan `scripts/check-early-reason.ts`, 20 Okt 2026). Belum terbukti lewat HTTP asli: alasan lain, dan penolakan EARLY_LEAVE_REASON_REQUIRED (tercakup tes unit)
+- [x] Client: halaman QR Lokasi (B, HRD/ADMIN): pemilih lokasi, QR SVG (`qrcode.react`), hitung mundur, refresh otomatis. Terbukti di browser: QR tampil dan berganti sendiri, dipakai untuk uji scan. Belum terbukti: skeleton dan error halaman ini
+- [x] Client: komponen `AttendanceButton` (tombol Absen 3D; state ready, locating, outside, weak, sending, done, idle) + chip jarak/akurasi. Terbukti di browser: Mencari lokasi, Di luar area, GPS lemah, siap, Pilih alasan dulu, Sudah pulang, mode gelap dan terang
+- [x] Client: scan QR (kamera, paket `jsqr`) + Geolocation API + kirim check-in/check-out (C2). Terbukti di browser dan TiDB asli: scan layar QR Lokasi dari HP lewat kamera laptop, check-in SIM0014 (telat 40 menit), check-out dengan alasan. Belum terbukti: jalur gagal di layar (QR kedaluwarsa, QR lokasi lain, GPS lemah saat kirim), pemindai dari kamera HP lewat HTTPS
+- [x] Beranda Karyawan (C1 + C2) dan komponen `ui/Select` (bottom sheet di HP, popover di desktop; dropdown alasan pulang awal). Belum terbukti dengan data asli: UPCOMING, AUTO_CLOSED, NO_SCHEDULE
+
+### Sisa koreksi Fase 2 (belum dikerjakan)
+- [ ] `auth.tsx`: token hanya dihapus bila `GET /auth/me` membalas 401 (sekarang 500 atau jaringan putus ikut melempar ke login)
+- [ ] Schedule: kartu "Libur rotasi" menyesatkan untuk bulan tanpa roster; ganti nilai px dengan token; judul bulan patah di lebar HP
+- [ ] `ui/Button.tsx`: variant danger/success memakai hex dan `text-[13px]` (lama)
+- [x] Audit `npm audit` client (20 Okt 2026): 7 peringatan (2 moderate, 5 high), semuanya dari rantai `tailwindcss` v3 (`braces`, `chokidar`, `micromatch`, `fast-glob`, `postcss-nested`, `postcss-selector-parser`), bukan dari `jsqr` atau `qrcode.react`. Alat build, bukan kode di browser. Satu-satunya perbaikan npm adalah lompat ke Tailwind 4 (breaking, melanggar aturan proyek Tailwind v3), jadi sengaja dibiarkan. Jangan `npm audit fix --force`
+- [ ] docs: bagian A (komponen Alert, termasuk tone sukses) di `design.md`; selisih tinggi input (`inputCls` 44 vs design.md 9.4 = 48); log server masih mencetak "[daily-close] TODO" (Fase 4)
+- [ ] Dropdown alasan pulang dan labelnya disalin dari server (`earlyLeave.ts`); kalau server menambah alasan, client harus ikut
+- [ ] Hapus `client/src/pages/Home.tsx` (tidak dipakai) lewat `git rm`
+- [ ] Keputusan bisnis (belum diputuskan): status absen tetap `TELAT` saat telat lalu pulang awal; apakah status "pulang cepat" perlu tampil juga
+
+### Fase 2b: Absen tanpa QR (selfie) (disetujui secara konsep, SETELAH C2; rincian belum final)
+- [ ] Perbarui `docs/alur.md` bagian 7 dan 8 lebih dulu (jalur tanpa QR: GPS + selfie langsung dari kamera, jam server, status "menunggu tinjauan", flag risiko; tinjauan HRD Sesuai/Mencurigakan tanpa mengubah jam absen; koreksi lewat pengajuan + audit log)
+- [ ] Server: `qr` menjadi opsional di `attendance.schema.ts` dan `presence.ts` (`assertPresence`), tabel/kolom selfie + status tinjauan (migrasi baru), unggah selfie aman
+- [ ] Client: kamera selfie langsung (tanpa pilih file galeri), alur "absen tanpa QR" di Beranda
+- [ ] Client + server: layar tinjauan HRD; absen yang belum ditinjau diselesaikan/diberi tanda sebelum periode dikunci (usulan, belum final)
+- Catatan: pencocokan wajah otomatis bukan bagian ini (data biometrik, UU PDP). Fake GPS tetap keterbatasan jujur web (dilapisi QR dinamis bila ada, device binding, flag risiko). Fingerprint mesin = sistem terpisah
 
 ## Fase 3: Workflow dan Pengajuan
 - [ ] Tabel + modul `workflow` (templates, steps) dan state machine request
