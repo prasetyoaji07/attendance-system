@@ -34,15 +34,17 @@ Centang saat selesai. Urutan penting: fase berikutnya bergantung pada fase sebel
 - [x] Beranda Karyawan (C1 + C2) dan komponen `ui/Select` (bottom sheet di HP, popover di desktop; dropdown alasan pulang awal). Belum terbukti dengan data asli: UPCOMING, AUTO_CLOSED, NO_SCHEDULE
 
 ### Sisa koreksi Fase 2 (belum dikerjakan)
-- [x] `auth.tsx`: token hanya dihapus bila `GET /auth/me` membalas 401 (sekarang 500 atau jaringan putus ikut melempar ke login)
+- [x] `auth.tsx`: token hanya dihapus bila `GET /auth/me` membalas 401 (sekarang 500 atau jaringan putus ikut melempar ke login). Terbukti di browser: API mati (502) dengan token ada memunculkan layar "Sesimu belum bisa dimuat", token tidak terhapus; setelah API menyala, login lalu Beranda normal. Belum terbukti: klik "Coba lagi" dengan token asli sampai Beranda; token palsu lalu "Coba lagi" mengarah ke login
 - [ ] Schedule: kartu "Libur rotasi" menyesatkan untuk bulan tanpa roster; ganti nilai px dengan token; judul bulan patah di lebar HP
-- [ ] `ui/Button.tsx`: variant danger/success memakai hex dan `text-[13px]` (lama)
+- [x] `ui/Button.tsx`: variant danger/success memakai hex dan `text-[13px]` (lama). Diganti saat tombol dirombak datar: commit 9390144 (tanpa hex, gradien, dan sisi tebal) dan 3c97db3 (hover primary `hover:bg-primary-700`). Lolos typecheck, belum terbukti di browser
 - [x] Audit `npm audit` client (20 Okt 2026): 7 peringatan (2 moderate, 5 high), semuanya dari rantai `tailwindcss` v3 (`braces`, `chokidar`, `micromatch`, `fast-glob`, `postcss-nested`, `postcss-selector-parser`), bukan dari `jsqr` atau `qrcode.react`. Alat build, bukan kode di browser. Satu-satunya perbaikan npm adalah lompat ke Tailwind 4 (breaking, melanggar aturan proyek Tailwind v3), jadi sengaja dibiarkan. Jangan `npm audit fix --force`
-- [ ] docs: bagian A (komponen Alert, termasuk tone sukses) di `design.md`; selisih tinggi input (`inputCls` 44 vs design.md 9.4 = 48); log server masih mencetak "[daily-close] TODO" (Fase 4)
+- [ ] docs: bagian A (komponen Alert, termasuk tone sukses) di `design.md` (selisih tinggi input 44 vs 48 sudah beres: design.md 9.4 kini 44, sesuai `inputCls`); log server masih mencetak "[daily-close] TODO" (Fase 4)
 - [ ] Dropdown alasan pulang dan labelnya disalin dari server (`earlyLeave.ts`); kalau server menambah alasan, client harus ikut
 - [x] Hapus `client/src/pages/Home.tsx` (tidak dipakai) lewat `git rm`
 - [x] `RequireRole`: peran yang tidak berhak diarahkan ke `/beranda` (sebelumnya `/jadwal`)
 - [ ] Keputusan bisnis (belum diputuskan): status absen tetap `TELAT` saat telat lalu pulang awal; apakah status "pulang cepat" perlu tampil juga
+- [ ] Dua `<select>` bawaan belum memakai `ui/Select`: `LocationQr.tsx` baris 79 dan `Schedule.tsx` baris 143. Yang Schedule digabung dengan koreksi Schedule di atas; LocationQr bisa langkah sendiri
+- [ ] Pesan "Terjadi kesalahan" untuk galat 502 kurang ramah (fallback di `api.ts`)
 
 ### Fase 2b: Absen tanpa QR (selfie) (disetujui secara konsep, SETELAH C2; rincian belum final)
 - [ ] Perbarui `docs/alur.md` bagian 7 dan 8 lebih dulu (jalur tanpa QR: GPS + selfie langsung dari kamera, jam server, status "menunggu tinjauan", flag risiko; tinjauan HRD Sesuai/Mencurigakan tanpa mengubah jam absen; koreksi lewat pengajuan + audit log)
@@ -50,6 +52,15 @@ Centang saat selesai. Urutan penting: fase berikutnya bergantung pada fase sebel
 - [ ] Client: kamera selfie langsung (tanpa pilih file galeri), alur "absen tanpa QR" di Beranda
 - [ ] Client + server: layar tinjauan HRD; absen yang belum ditinjau diselesaikan/diberi tanda sebelum periode dikunci (usulan, belum final)
 - Catatan: pencocokan wajah otomatis bukan bagian ini (data biometrik, UU PDP). Fake GPS tetap keterbatasan jujur web (dilapisi QR dinamis bila ada, device binding, flag risiko). Fingerprint mesin = sistem terpisah
+
+## Fase desain: tampilan putih, hitam, oranye (lintas fase)
+Arah datar-modern (gaya "sisi tebal 3D" lama dihapus): putih untuk latar dan kartu, hitam untuk aksi utama dan menu aktif, oranye hemat. Ringkasan lengkap ada di `docs/design.md`.
+- [x] Langkah 1, palet: `tokens.css` (commit 41da568)
+- [x] Langkah 2, tombol dan menu: `tailwind.config.ts` (a1f2096), `ui/Button.tsx` (9390144, 3c97db3), `AttendanceButton.tsx` lingkaran oranye datar (3ff61e9), `AppShell.tsx` pil menu aktif, hitam di sidebar desktop dan oranye di nav bawah HP (a852a31). Lolos typecheck, belum terbukti di browser
+- [x] Langkah 4, dokumen: `docs/design.md` disesuaikan dengan kode sampai a852a31 (84da477). Dokumen saja, tampilan belum terbukti di browser
+- [ ] Langkah 3, gerak (framer-motion): kartu masuk bergantian, angka berhitung, pil menu bergeser, transisi halaman, hormati `prefers-reduced-motion`. SENGAJA DITUNDA sampai fungsional selesai
+- [ ] Kontras: teks putih di atas `primary-500` (sekitar 2,8:1), `success` (sekitar 2,5:1), dan `danger` (sekitar 3,8:1) belum lolos; perlu token yang lebih tua
+- [ ] Belum terbukti di browser (terang dan gelap): Login, Beranda, hover tombol (Masuk, Tolak/Setujui), nav bawah HP pil oranye, sidebar pil hitam, Tombol Absen datar
 
 ## Fase 3: Workflow dan Pengajuan
 - [ ] Tabel + modul `workflow` (templates, steps) dan state machine request
