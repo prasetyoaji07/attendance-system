@@ -34,13 +34,13 @@ Centang saat selesai. Urutan penting: fase berikutnya bergantung pada fase sebel
 - [x] Beranda Karyawan (C1 + C2) dan komponen `ui/Select` (bottom sheet di HP, popover di desktop; dropdown alasan pulang awal). Belum terbukti dengan data asli: UPCOMING, AUTO_CLOSED, NO_SCHEDULE
 
 ### Sisa koreksi Fase 2 (belum dikerjakan)
-- [ ] `auth.tsx`: token hanya dihapus bila `GET /auth/me` membalas 401 (sekarang 500 atau jaringan putus ikut melempar ke login)
+- [x] `auth.tsx`: token hanya dihapus bila `GET /auth/me` membalas 401 (sekarang 500 atau jaringan putus ikut melempar ke login)
 - [ ] Schedule: kartu "Libur rotasi" menyesatkan untuk bulan tanpa roster; ganti nilai px dengan token; judul bulan patah di lebar HP
 - [ ] `ui/Button.tsx`: variant danger/success memakai hex dan `text-[13px]` (lama)
 - [x] Audit `npm audit` client (20 Okt 2026): 7 peringatan (2 moderate, 5 high), semuanya dari rantai `tailwindcss` v3 (`braces`, `chokidar`, `micromatch`, `fast-glob`, `postcss-nested`, `postcss-selector-parser`), bukan dari `jsqr` atau `qrcode.react`. Alat build, bukan kode di browser. Satu-satunya perbaikan npm adalah lompat ke Tailwind 4 (breaking, melanggar aturan proyek Tailwind v3), jadi sengaja dibiarkan. Jangan `npm audit fix --force`
 - [ ] docs: bagian A (komponen Alert, termasuk tone sukses) di `design.md`; selisih tinggi input (`inputCls` 44 vs design.md 9.4 = 48); log server masih mencetak "[daily-close] TODO" (Fase 4)
 - [ ] Dropdown alasan pulang dan labelnya disalin dari server (`earlyLeave.ts`); kalau server menambah alasan, client harus ikut
-- [ ] Hapus `client/src/pages/Home.tsx` (tidak dipakai) lewat `git rm`
+- [x] Hapus `client/src/pages/Home.tsx` (tidak dipakai) lewat `git rm`
 - [ ] Keputusan bisnis (belum diputuskan): status absen tetap `TELAT` saat telat lalu pulang awal; apakah status "pulang cepat" perlu tampil juga
 
 ### Fase 2b: Absen tanpa QR (selfie) (disetujui secara konsep, SETELAH C2; rincian belum final)
