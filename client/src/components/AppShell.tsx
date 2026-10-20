@@ -49,8 +49,8 @@ export default function AppShell() {
               key={to}
               to={to}
               className={({ isActive }) =>
-                `flex h-11 items-center gap-3 rounded-md px-3 font-semibold transition-colors ${
-                  isActive ? 'bg-primary-50 text-primary-600' : 'text-muted hover:bg-surface-2 hover:text-text'
+                `flex h-11 items-center gap-3 rounded-full px-4 font-semibold transition-colors ${
+                  isActive ? 'bg-contrast-bg text-contrast-text' : 'text-muted hover:bg-surface-2 hover:text-text'
                 }`
               }
             >
@@ -110,14 +110,18 @@ export default function AppShell() {
           <NavLink
             key={to}
             to={to}
-            className={({ isActive }) =>
-              `flex h-16 flex-1 flex-col items-center justify-center gap-1 text-caption font-semibold ${
-                isActive ? 'text-primary-600' : 'text-muted'
-              }`
-            }
+            className="flex h-16 flex-1 items-center justify-center text-caption font-semibold"
           >
-            <Icon size={22} strokeWidth={1.75} />
-            {label}
+            {({ isActive }) => (
+              <span
+                className={`flex flex-col items-center gap-1 rounded-full px-4 py-1.5 transition-colors ${
+                  isActive ? 'bg-primary-500 text-white' : 'text-muted'
+                }`}
+              >
+                <Icon size={22} strokeWidth={1.75} />
+                {label}
+              </span>
+            )}
           </NavLink>
         ))}
       </nav>
