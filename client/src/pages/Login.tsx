@@ -18,9 +18,9 @@ export default function Login() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  if (status === 'authed') return <Navigate to="/jadwal" replace />;
+  if (status === 'authed') return <Navigate to="/beranda" replace />;
 
-  const from = (location.state as { from?: string } | null)?.from ?? '/jadwal';
+  const from = (location.state as { from?: string } | null)?.from ?? '/beranda';
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();

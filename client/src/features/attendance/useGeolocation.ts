@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { ApiError } from '@/lib/api';
 
 export type GeoState =
   | { status: 'idle' }
@@ -7,6 +8,12 @@ export type GeoState =
   | { status: 'denied' }
   | { status: 'unavailable' }
   | { status: 'error'; message: string };
+
+const GEO_OPTIONS: PositionOptions = { enableHighAccuracy: true, timeout: 15_000, maximumAge: 0 };
+
+function geoAvailable(): boolean {
+  return typeof navigator !== 'undefined' && 'geolocation' in navigator && window.isSecureContext;
+}
 
 /**
  * Lokasi sekali ambil (bukan pelacakan terus-menerus; lokasi hanya diambil saat dibutuhkan untuk absen).
@@ -18,7 +25,7 @@ export function useGeolocation(enabled: boolean): { geo: GeoState; refresh: () =
 
   const refresh = useCallback(() => {
     const id = ++run.current;
-    if (typeof navigator === 'undefined' || !('geolocation' in navigator) || !window.isSecureContext) {
+    if (!geoAvailable()) {
       setGeo({ status: 'unavailable' });
       return;
     }
@@ -39,7 +46,7 @@ export function useGeolocation(enabled: boolean): { geo: GeoState; refresh: () =
         else if (err.code === err.TIMEOUT) setGeo({ status: 'error', message: 'Mencari lokasi terlalu lama. Pindah ke tempat terbuka lalu coba lagi.' });
         else setGeo({ status: 'error', message: 'Lokasi belum bisa ditemukan. Cek GPS di HP-mu lalu coba lagi.' });
       },
-      { enableHighAccuracy: true, timeout: 15_000, maximumAge: 0 },
+      GEO_OPTIONS,
     );
   }, []);
 
@@ -56,4 +63,30 @@ export function useGeolocation(enabled: boolean): { geo: GeoState; refresh: () =
   }, [enabled, refresh]);
 
   return { geo, refresh };
+}
+
+/**
+ * Ambil lokasi BARU tepat sebelum absen dikirim (bukan lokasi saat halaman dibuka, supaya tidak basi).
+ * Gagal dilempar sebagai ApiError dengan pesan ramah, jadi friendlyError() langsung bisa menampilkannya.
+ */
+export function getPositionOnce(): Promise<{ lat: number; lng: number; accuracyM: number }> {
+  return new Promise((resolve, reject) => {
+    if (!geoAvailable()) {
+      reject(new ApiError(0, 'GEO_UNAVAILABLE', 'Browser ini tidak bisa memakai lokasi. Buka lewat HTTPS atau localhost.'));
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude, accuracyM: pos.coords.accuracy }),
+      (err) => {
+        const message =
+          err.code === err.PERMISSION_DENIED
+            ? 'Izin lokasi ditolak. Aktifkan lokasi untuk situs ini di pengaturan browser, lalu coba lagi.'
+            : err.code === err.TIMEOUT
+              ? 'Mencari lokasi terlalu lama. Pindah ke tempat terbuka lalu scan lagi.'
+              : 'Lokasi belum bisa ditemukan. Cek GPS di HP-mu lalu scan lagi.';
+        reject(new ApiError(0, 'GEO_FAILED', message));
+      },
+      GEO_OPTIONS,
+    );
+  });
 }

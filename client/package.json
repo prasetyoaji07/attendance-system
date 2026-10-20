@@ -12,6 +12,7 @@
   "dependencies": {
     "@tanstack/react-query": "^5.104.4",
     "dayjs": "^1.11.23",
+    "jsqr": "^1.4.0",
     "lucide-react": "^1.59.0",
     "qrcode.react": "^4.2.0",
     "react": "^19.3.1",
