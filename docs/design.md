@@ -363,6 +363,23 @@ Kartu yang bisa diklik: hover naik satu level bayangan (tanpa gerak).
 - Chip filter: pill tinggi 36, aktif = latar `primary-500` teks putih (catatan kontras di bagian 12), tidak aktif = latar `surface-2`.
 - Tabs: garis bawah 2px `primary-500` pada tab aktif; di mobile boleh digeser horizontal.
 
+### 9.12 Alert
+
+Sumber: `client/src/components/ui/Alert.tsx`. Pesan di dalam halaman (bukan toast): tetap tampil sampai keadaannya berubah.
+
+| Tone | Latar | Ikon (lucide) | Dipakai |
+|---|---|---|---|
+| `success` | `success-bg` | `CircleCheck` warna `success` | Konfirmasi yang perlu tetap terlihat, mis. "Perangkat disetujui" |
+| `warning` | `warning-bg` | `CircleAlert` warna `warning` | Perlu perhatian tetapi belum gagal, mis. "Perangkat belum terdaftar" |
+| `danger` | `danger-bg` | `CircleAlert` warna `danger` | Gagal dan butuh tindakan, mis. sesi tidak bisa dimuat |
+| `info` (bawaan) | `info-bg` | `CircleAlert` warna `info` | Informasi netral |
+
+- Bentuk: `radius-md`, padding X 16 dan Y 12, ikon 20 (garis 1.75) di kiri, jarak ikon-teks 12.
+- Teks selalu `text` (bukan warna semantik) supaya kontras 4.5:1 aman di terang dan gelap. Makna dibawa ikon + judul + latar, bukan warna saja.
+- Isi: `title` opsional (semibold), lalu pesan satu kalimat sesuai bagian 13. Slot `action` opsional untuk tombol, jarak 12 dari teks. Pakai varian `secondary` (satu `primary` per layar).
+- Aksesibilitas: tone `danger` memakai `role="alert"` (dibacakan langsung); tone lain `role="status"`.
+- Beda dengan Toast (9.9): Alert menempel di dalam halaman dan tidak hilang sendiri; Toast muncul sebentar untuk hasil aksi.
+
 ---
 
 ## 10. Halaman Kunci (panduan komposisi)
