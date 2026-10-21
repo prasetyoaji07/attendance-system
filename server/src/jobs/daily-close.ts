@@ -7,5 +7,5 @@
  * Harus idempotent (aman dijalankan dua kali).
  */
 export async function runDailyClose(): Promise<void> {
-  console.log('[daily-close] TODO: belum diimplementasi');
+  console.log('[daily-close] dilewati: penutupan harian belum dibuat (Fase 4), tidak ada data yang diubah');
 }
