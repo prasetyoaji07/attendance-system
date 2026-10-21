@@ -1,4 +1,4 @@
-import { CalendarOff, CircleAlert, LocateFixed, MapPin } from 'lucide-react';
+import { CalendarOff, CircleAlert, Clock, LocateFixed, LogOut, MapPin } from 'lucide-react';
 import { useState } from 'react';
 import { AttendanceButton, type AttendanceButtonState } from '@/components/AttendanceButton';
 import { Alert } from '@/components/ui/Alert';
@@ -295,10 +295,22 @@ export default function Beranda() {
               </>
             ) : null}
           </p>
-          <p className="text-caption text-muted">
-            {att.lateMinutes > 0 ? `Telat ${att.lateMinutes} menit. Tetap tercatat hadir.` : 'Tepat waktu.'}
-            {att.earlyLeaveMinutes > 0 ? ` Pulang ${att.earlyLeaveMinutes} menit lebih awal.` : ''}
-          </p>
+          {att.lateMinutes > 0 || att.earlyLeaveMinutes > 0 ? (
+            <div className="mt-2 flex flex-wrap gap-2">
+              {att.lateMinutes > 0 && (
+                <Chip warn icon={<Clock size={14} strokeWidth={1.75} aria-hidden="true" />}>
+                  Telat <span className="font-mono">{att.lateMinutes}</span> menit
+                </Chip>
+              )}
+              {att.earlyLeaveMinutes > 0 && (
+                <Chip warn icon={<LogOut size={14} strokeWidth={1.75} aria-hidden="true" />}>
+                  Pulang cepat <span className="font-mono">{att.earlyLeaveMinutes}</span> menit
+                </Chip>
+              )}
+            </div>
+          ) : (
+            <p className="text-caption text-muted">Tepat waktu.</p>
+          )}
         </div>
       )}
 
