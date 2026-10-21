@@ -36,7 +36,13 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
   const body = await res.json().catch(() => null);
   if (!res.ok) {
     const e = body?.error;
-    throw new ApiError(res.status, e?.code ?? 'UNKNOWN', e?.message ?? 'Terjadi kesalahan', e?.details);
+    // Galat 502/503/504 biasanya datang dari proxy/gateway tanpa isi JSON, jadi pesannya dipilih dari status.
+    const unreachable = res.status === 502 || res.status === 503 || res.status === 504;
+    const fallbackCode = unreachable ? 'SERVER_UNAVAILABLE' : 'UNKNOWN';
+    const fallbackMessage = unreachable
+      ? 'Server sedang tidak bisa dijangkau. Tunggu sebentar lalu coba lagi ya.'
+      : 'Terjadi kesalahan. Coba lagi ya.';
+    throw new ApiError(res.status, e?.code ?? fallbackCode, e?.message ?? fallbackMessage, e?.details);
   }
   return body as T;
 }
