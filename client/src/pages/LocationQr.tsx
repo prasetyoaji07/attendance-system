@@ -3,6 +3,7 @@ import { QRCodeSVG } from 'qrcode.react';
 import { useEffect, useState } from 'react';
 import { Alert } from '@/components/ui/Alert';
 import { Button } from '@/components/ui/Button';
+import { Select } from '@/components/ui/Select';
 import { useLocationQr, useLocations } from '@/features/locations/useLocationQr';
 import { friendlyError } from '@/lib/api-errors';
 
@@ -72,23 +73,12 @@ export default function LocationQr() {
       ) : (
         <div className="flex flex-col gap-4">
           {list && list.length > 1 && (
-            <div className="flex flex-col gap-2">
-              <label htmlFor="lokasi" className="text-caption font-semibold text-muted">
-                Lokasi
-              </label>
-              <select
-                id="lokasi"
-                value={selectedId ?? ''}
-                onChange={(e) => setPicked(e.target.value)}
-                className="h-12 rounded-md border border-border bg-surface px-4 text-body text-text focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-primary-200"
-              >
-                {list.map((l) => (
-                  <option key={l.id} value={String(l.id)}>
-                    {l.nama}
-                  </option>
-                ))}
-              </select>
-            </div>
+            <Select
+              label="Lokasi"
+              value={selectedId ?? ''}
+              onChange={setPicked}
+              options={list.map((l) => ({ value: String(l.id), label: l.nama }))}
+            />
           )}
 
           {qr.isError ? (
