@@ -1,6 +1,7 @@
 /**
  * Alasan pulang sebelum jam selesai shift (C0b). Dropdown saja, tanpa teks bebas.
- * Satu tempat untuk: validasi zod di server dan label di client (client menyalin label ini).
+ * Satu tempat untuk: validasi zod di server dan label di client (client menyalin daftar dan label ini
+ * ke client/src/features/attendance/earlyLeave.ts; server/src/tests/early-leave-sync.test.ts menjaga keduanya sama).
  * Menambah alasan baru cukup di sini (kolom DB `early_leave_reason` berupa VARCHAR, bukan ENUM).
  *
  * Catatan: SAKIT_KECELAKAAN hanya DISIMPAN. Ini BUKAN sistem tanggap darurat; flag/notifikasi menyusul (Fase 3/5).
