@@ -1,6 +1,8 @@
 /**
  * Alasan pulang sebelum jam selesai. SALINAN dari server/src/core/early-leave-reasons.ts
  * (kode harus persis sama; server menolak kode lain). Label ikut disalin.
+ * Dijaga oleh server/src/tests/early-leave-sync.test.ts: bila server menambah/mengubah alasan,
+ * `npm test` gagal sampai file ini disamakan.
  */
 export const EARLY_LEAVE_REASONS = [
   'SAKIT_KECELAKAAN',
