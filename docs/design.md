@@ -152,7 +152,9 @@ Basis **4 px**. Hanya pakai nilai di skala ini.
 | `space-8` | 32 | `8` |
 | `space-10` | 40 | `10` |
 | `space-12` | 48 | `12` |
+| `space-14` | 56 | `14` |
 | `space-16` | 64 | `16` |
+| `space-24` | 96 | `24` |
 
 Pemakaian baku:
 
