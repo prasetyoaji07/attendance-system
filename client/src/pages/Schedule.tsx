@@ -2,7 +2,7 @@ import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { ChevronLeft, ChevronRight, MoonStar } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { Button } from '@/components/ui/Button';
-import { inputCls } from '@/components/ui/inputClass';
+import { Select } from '@/components/ui/Select';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
@@ -118,6 +118,13 @@ export default function Schedule() {
     return { kerja, malam, libur, liburNasional };
   }, [cells, rosterByDate, holidayByDate]);
 
+  const employeeOptions = [
+    { value: String(user?.employeeId ?? 0), label: `Saya (${user?.nik ?? ''})` },
+    ...(employees.data?.data ?? [])
+      .filter((e) => e.id !== user?.employeeId)
+      .map((e) => ({ value: String(e.id), label: `${e.nik} · ${e.nama}` })),
+  ];
+
   const today = dayjs().format(ISO);
   const hasData = dataReady && (roster.data?.data ?? []).length > 0;
   const selRoster = rosterByDate.get(selected);
@@ -138,33 +145,29 @@ export default function Schedule() {
           <p className="text-muted">{targetName}</p>
         </div>
         {canPick && (
-          <label className="flex w-full flex-col gap-1.5 sm:w-72">
-            <span className="text-caption text-muted">Karyawan</span>
-            <select
-              className={inputCls}
-              value={targetId}
-              onChange={(e) => setEmployeeId(Number(e.target.value))}
-            >
-              <option value={user?.employeeId}>Saya ({user?.nik})</option>
-              {(employees.data?.data ?? [])
-                .filter((e) => e.id !== user?.employeeId)
-                .map((e) => (
-                  <option key={e.id} value={e.id}>
-                    {e.nik} · {e.nama}
-                  </option>
-                ))}
-            </select>
-          </label>
+          <div className="w-full sm:w-72">
+            <Select
+              label="Karyawan"
+              value={String(targetId)}
+              onChange={(v) => setEmployeeId(Number(v))}
+              options={employeeOptions}
+            />
+          </div>
         )}
       </div>
 
-      <div className="flex items-center justify-between gap-2">
-        <Button variant="secondary" size="sm" onClick={() => go(-1)} aria-label="Bulan sebelumnya">
-          <ChevronLeft size={20} strokeWidth={1.75} />
-        </Button>
-        <div className="flex flex-1 items-center justify-center gap-3">
-          <h2 className="capitalize">{month.format('MMMM YYYY')}</h2>
-          {!month.isSame(dayjs(), 'month') && (
+      <div className="flex flex-col gap-2">
+        <div className="flex items-center justify-between gap-2">
+          <Button variant="secondary" size="sm" onClick={() => go(-1)} aria-label="Bulan sebelumnya">
+            <ChevronLeft size={20} strokeWidth={1.75} />
+          </Button>
+          <h2 className="flex-1 whitespace-nowrap text-center capitalize">{month.format('MMMM YYYY')}</h2>
+          <Button variant="secondary" size="sm" onClick={() => go(1)} aria-label="Bulan berikutnya">
+            <ChevronRight size={20} strokeWidth={1.75} />
+          </Button>
+        </div>
+        {!month.isSame(dayjs(), 'month') && (
+          <div className="flex justify-center">
             <Button
               variant="ghost"
               size="sm"
@@ -175,11 +178,8 @@ export default function Schedule() {
             >
               Hari ini
             </Button>
-          )}
-        </div>
-        <Button variant="secondary" size="sm" onClick={() => go(1)} aria-label="Bulan berikutnya">
-          <ChevronRight size={20} strokeWidth={1.75} />
-        </Button>
+          </div>
+        )}
       </div>
 
       {failed && (
@@ -203,10 +203,10 @@ export default function Schedule() {
       )}
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        <Stat label="Hari kerja" value={dataReady ? stats.kerja : null} pending={pending} />
-        <Stat label="Shift malam" value={dataReady ? stats.malam : null} pending={pending} color="var(--violet)" />
+        <Stat label="Hari kerja" value={hasData ? stats.kerja : null} pending={pending} />
+        <Stat label="Shift malam" value={hasData ? stats.malam : null} pending={pending} color="var(--violet)" />
         <Stat label="Libur nasional" value={dataReady ? stats.liburNasional : null} pending={pending} color="var(--danger)" />
-        <Stat label="Libur rotasi" value={dataReady ? stats.libur : null} pending={pending} />
+        <Stat label="Libur rotasi" value={hasData ? stats.libur : null} pending={pending} />
       </div>
 
       <section aria-label="Kalender jadwal" aria-busy={pending} className={`card p-2 sm:p-4 ${pending ? 'animate-pulse' : ''}`}>
@@ -232,7 +232,7 @@ export default function Schedule() {
                 onClick={() => setSelected(date)}
                 aria-pressed={isSel}
                 aria-label={dataReady ? `${dayLabel}: ${h ? h.nama : r ? r.shiftNama : 'libur'}` : dayLabel}
-                className={`flex min-h-[56px] flex-col items-stretch gap-0.5 rounded-sm border p-1 text-left transition-colors md:min-h-[92px] md:p-2 ${
+                className={`flex min-h-14 flex-col items-stretch gap-0.5 rounded-sm border p-1 text-left transition-colors md:min-h-24 md:p-2 ${
                   isSel ? 'border-primary-500 ring-2 ring-primary-200' : 'border-transparent hover:border-border'
                 } ${h ? 'bg-[var(--danger-bg)]' : 'bg-surface-2'}`}
               >
@@ -245,7 +245,7 @@ export default function Schedule() {
                 </span>
                 {r && st && (
                   <span
-                    className={`flex items-center justify-center rounded-sm px-1 text-[11px] font-bold md:justify-start md:text-caption ${
+                    className={`flex items-center justify-center rounded-sm px-1 text-caption font-bold md:justify-start ${
                       h ? 'opacity-60' : ''
                     }`}
                     style={{ background: st.bg, color: st.color }}
@@ -256,16 +256,16 @@ export default function Schedule() {
                   </span>
                 )}
                 {r && (
-                  <span className="tabular hidden text-[11px] text-muted md:block">
+                  <span className="tabular hidden text-caption text-muted md:block">
                     {hhmm(r.jamMulai)}–{hhmm(r.jamSelesai)}
                   </span>
                 )}
                 {!r && prev?.lintasHari && (
-                  <span className="hidden text-[11px] text-muted md:block">↳ s/d {hhmm(prev.jamSelesai)}</span>
+                  <span className="hidden text-caption text-muted md:block">↳ s/d {hhmm(prev.jamSelesai)}</span>
                 )}
-                {h && <span className="hidden truncate text-[11px] font-semibold text-danger md:block">{h.nama}</span>}
+                {h && <span className="hidden truncate text-caption font-semibold text-danger md:block">{h.nama}</span>}
                 {dataReady && !r && !h && !prev?.lintasHari && (
-                  <span className="hidden text-[11px] text-faint md:block">Libur</span>
+                  <span className="hidden text-caption text-faint md:block">Libur</span>
                 )}
               </button>
             );
