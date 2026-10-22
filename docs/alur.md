@@ -15,7 +15,7 @@
 | Fase | Isi | Status |
 |---|---|---|
 | 1 | Master data, shift, roster, engine status harian + unit test | MVP |
-| 2 | Check-in: geofencing, QR dinamis, device binding | MVP |
+| 2 | Check-in: geofencing, QR dinamis, device binding; absen tanpa QR dengan selfie (Fase 2b) | MVP |
 | 3 | Workflow engine, cuti/izin, lembur | MVP |
 | 4 | Cron alpa, tutup periode, export Excel | MVP |
 | 5 | Dashboard, skor risiko, integrasi maintenance-system | Lanjutan |
@@ -43,6 +43,9 @@
 | Lembur harian maksimal | 4 jam | Peringatan, bukan blokir |
 | Kuota cuti tahunan | 12 hari | Per `leave_types` |
 | Zona waktu | Asia/Jakarta (WIB) | Simpan UTC di DB, tampilkan WIB |
+| Absen tanpa QR | Selalu tersedia, sejajar dengan scan QR | Untuk masuk dan pulang. Tanpa QR wajib selfie (bagian 7.1b) |
+| Masa simpan selfie | 30 hari, lalu dihapus | Simulasi, atur sesuai kebijakan perusahaan dan UU PDP |
+| Sampel tinjauan acak | 10% dari absen tanpa QR | Simulasi, di luar yang berflag risiko |
 
 > Cek ulang angka di atas dengan aturan perusahaan/regulasi terbaru sebelum dipakai sungguhan.
 
@@ -118,7 +121,8 @@ attendance-system/
 | Tabel | Kolom penting |
 |---|---|
 | `rosters` | id, employee_id, **shift_date**, shift_id, location_id. **UNIQUE(employee_id, shift_date)** |
-| `attendance` | id, roster_id (UNIQUE), check_in_at, check_out_at, lat_in, lng_in, lat_out, lng_out, distance_m, accuracy_m, late_minutes, status |
+| `attendance` | id, roster_id (UNIQUE), check_in_at, check_out_at, lat_in, lng_in, lat_out, lng_out, distance_m, accuracy_m, late_minutes, status, **check_in_method**, **check_out_method** (`QR` / `NO_QR`), **review_status** (`NOT_REQUIRED` / `PENDING` / `SESUAI` / `MENCURIGAKAN`) |
+| `attendance_selfies` | id, attendance_id, jenis (`IN` / `OUT`), file_ref, captured_at, expires_at. Gambar tidak disimpan di tabel; tempat penyimpanannya diputuskan saat implementasi |
 | `devices` | id, user_id, device_id, status (`active` / `pending`) |
 | `requests` | id, type, employee_id, payload (JSON), status, current_step |
 | `request_approvals` | id, request_id, step, approver_id, keputusan, catatan, waktu |
@@ -171,7 +175,7 @@ erDiagram
 
 ```mermaid
 flowchart TD
-    A[Karyawan buka app<br/>ambil GPS + scan QR] --> B[POST /attendance/check-in]
+    A[Karyawan buka app<br/>ambil GPS + scan QR atau selfie] --> B[POST /attendance/check-in]
     B --> C{JWT valid?}
     C -- tidak --> X1[401]
     C -- ya --> D{Device terdaftar?}
@@ -184,17 +188,34 @@ flowchart TD
     G -- tidak --> X5[Sinyal GPS lemah]
     G -- ya --> H{Jarak ≤ radius?<br/>Haversine}
     H -- tidak --> X6[Anda 340 m dari lokasi]
-    H -- ya --> I{QR valid?<br/>HMAC + belum expired}
-    I -- tidak --> X7[400 QR tidak valid]
-    I -- ya --> J[Hitung late_minutes]
-    J --> K[BEGIN TX, INSERT attendance, COMMIT]
-    K --> L[Cek rule risiko, simpan risk_flag]
+    H -- ya --> I{QR dikirim?}
+    I -- ya --> I2{QR valid?<br/>HMAC + belum expired}
+    I2 -- tidak --> X7[400 QR tidak valid]
+    I2 -- ya --> J[Hitung late_minutes]
+    I -- tidak --> S{Selfie dari kamera ada?}
+    S -- tidak --> X8[400 Selfie wajib]
+    S -- ya --> J
+    J --> K[BEGIN TX, INSERT attendance + selfie bila tanpa QR, COMMIT]
+    K --> L[Cek rule risiko, simpan risk_flag<br/>tanpa QR: flag NO_QR]
     L --> M[Respons: Check-in 07:03, terlambat 3 menit]
 ```
 
 **Rumus telat:** `late_minutes = max(0, now - (jam_mulai + toleransi))`
 
 **Menentukan roster aktif:** ambil roster `shift_date` kemarin, hari ini, dan besok, pilih yang jendelanya `[mulai - 2 jam, selesai + 2 jam]` memuat waktu sekarang. Ini yang membuat shift malam lintas tengah malam tetap benar.
+
+### 7.1b Absen tanpa QR dan tinjauan HRD
+
+Beranda menyediakan dua jalur yang sejajar, untuk absen masuk dan pulang: **scan QR** (bila lokasi punya layar QR) dan **absen tanpa QR**. Alasannya praktis: tidak semua perusahaan memasang perangkat di tiap titik, dan antre scan menghambat.
+
+- **Syarat tanpa QR:** akurasi GPS dan jarak geofence sama seperti jalur QR (bagian 2), perangkat sudah disetujui (device binding), dan **selfie diambil langsung dari kamera** (bukan memilih dari galeri). Selfie dikecilkan di HP sebelum dikirim.
+- **Jam absen selalu jam server**, bukan jam HP. Status dan menit telat dihitung seperti biasa.
+- **Absen tanpa QR langsung sah.** Karyawan tidak menunggu persetujuan. Setiap absen tanpa QR diberi flag `NO_QR` di `risk_flags`.
+- **QR yang dikirim tetapi salah atau kedaluwarsa tetap ditolak** (aturan 9). Sistem tidak diam-diam pindah ke jalur tanpa QR; karyawan yang mau tanpa QR cukup tidak mengirim QR.
+- **Tinjauan HRD berbasis pengecualian.** Antreannya berisi absen berflag risiko ditambah sampel acak (bagian 2). `review_status` bernilai `NOT_REQUIRED` (lewat QR atau tidak terpilih), `PENDING`, `SESUAI`, atau `MENCURIGAKAN`. **Hasil tinjauan tidak mengubah jam absen.** Tindak lanjut lewat pengajuan koreksi dan audit log (aturan 10).
+- **Periode tidak bisa dikunci** selama masih ada absen berstatus tinjauan `PENDING` (usulan, belum final).
+- **Privasi selfie:** hanya diambil saat absen tanpa QR, hanya bisa dilihat HRD dan Admin, dihapus setelah masa simpan (bagian 2), dan **tanpa pencocokan wajah otomatis** (data biometrik, UU PDP).
+- **Keterbatasan jujur:** jalur tanpa QR lebih mudah dicurangi daripada jalur QR. Selfie bisa difoto dari layar, dan di laptop kamera bisa diganti kamera virtual. Selfie dan tinjauan berfungsi sebagai pencegah dan bukti, bukan jaminan. Rule berbasis pola (lokasi melompat jauh dalam waktu singkat, koordinat dan akurasi identik berulang) menunggu Fase 5.
 
 ### 7.2 Penutupan Harian (cron, tiap malam)
 
@@ -287,6 +308,10 @@ Generate rekap harus **idempotent**: dijalankan dua kali menghasilkan hasil yang
 8. Check-in di luar jendela waktu ditolak.
 9. QR yang sudah expired atau tanda tangannya salah ditolak.
 10. Koreksi absen tidak mengubah data langsung, hanya lewat pengajuan dan tercatat di audit log.
+11. Absen tanpa QR wajib menyertakan selfie langsung dari kamera, dan jam absennya selalu jam server.
+12. QR yang dikirim tetapi tidak valid ditolak; tidak otomatis dialihkan ke jalur tanpa QR.
+13. Hasil tinjauan HRD tidak mengubah jam absen; perubahan hanya lewat pengajuan koreksi dan tercatat di audit log.
+14. Periode tidak bisa dikunci selama masih ada absen dengan tinjauan `PENDING` (usulan).
 
 ---
 
@@ -302,18 +327,18 @@ Generate rekap harus **idempotent**: dijalankan dua kali menghasilkan hasil yang
   - Profil telat dasar per divisi: Gudang 16%, Produksi 10%, Maintenance 7%, Quality Control 4%, HR 2,5%; Senin 1,4x; ~8% karyawan telat kronis. Hanya roster yang shift-nya sudah selesai yang diberi absen.
   - Query dashboard: baris `LIBUR` harus dikeluarkan dari penyebut tingkat kehadiran/telat.
   - Hari libur di tabel `holidays` (termasuk cuti bersama, ditandai di nama) diverifikasi dari SKB 3 Menteri 2025/2026.
-- Privasi: lokasi hanya diambil **saat absen**, tidak dilacak terus-menerus.
-- Keterbatasan jujur: aplikasi web tidak bisa mendeteksi fake GPS, maka dilapisi QR dinamis, device binding, dan flag risiko.
+- Privasi: lokasi hanya diambil **saat absen**, tidak dilacak terus-menerus. Selfie hanya diambil saat absen tanpa QR (bagian 7.1b).
+- Keterbatasan jujur: aplikasi web tidak bisa mendeteksi fake GPS, maka dilapisi QR dinamis, device binding, dan flag risiko. Jalur absen tanpa QR (7.1b) lebih mudah dicurangi daripada jalur QR; selfie dan tinjauan HRD berfungsi sebagai pencegah dan bukti, bukan jaminan.
 
 ---
 
 ## 10. Urutan Pengerjaan
 
 1. **Fondasi:** skema DB, seed, employees, shifts, roster, fungsi hitung status harian + unit test.
-2. **Check-in:** geofencing, QR dinamis, device binding.
+2. **Check-in:** geofencing, QR dinamis, device binding, lalu absen tanpa QR dengan selfie (Fase 2b).
 3. **Workflow engine** untuk cuti/izin, lalu lembur.
 4. **Cron dan rekap:** alpa otomatis, penguncian periode, export Excel.
-5. **Dashboard** dan skor risiko.
+5. **Dashboard** dan skor risiko (termasuk rule pola: lokasi melompat, koordinat identik berulang).
 6. **Integrasi** maintenance-system (satu login, mekanik cuti tidak bisa ditugaskan), deploy, README dengan screenshot.
 
 ---
