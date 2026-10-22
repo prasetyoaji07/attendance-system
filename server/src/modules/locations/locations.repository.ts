@@ -9,9 +9,10 @@ interface LocationRow extends RowDataPacket {
   lat: string;
   lng: string;
   radiusM: number;
+  alamat: string | null;
 }
 
-const SELECT = 'SELECT id, nama, lat, lng, radius_m AS radiusM FROM locations';
+const SELECT = 'SELECT id, nama, lat, lng, radius_m AS radiusM, alamat FROM locations';
 
 const toRecord = (r: LocationRow): LocationRecord => ({
   id: r.id,
@@ -19,6 +20,7 @@ const toRecord = (r: LocationRow): LocationRecord => ({
   lat: Number(r.lat),
   lng: Number(r.lng),
   radiusM: r.radiusM,
+  alamat: r.alamat ?? null,
 });
 
 export const locationsRepository: LocationsRepository = {
@@ -32,17 +34,18 @@ export const locationsRepository: LocationsRepository = {
   },
   async insert(d, tx) {
     const [res] = await dbOf(tx).execute<ResultSetHeader>(
-      'INSERT INTO locations (nama, lat, lng, radius_m) VALUES (?, ?, ?, ?)',
-      [d.nama, d.lat, d.lng, d.radiusM],
+      'INSERT INTO locations (nama, lat, lng, radius_m, alamat) VALUES (?, ?, ?, ?, ?)',
+      [d.nama, d.lat, d.lng, d.radiusM, d.alamat ?? null],
     );
     return res.insertId;
   },
   async update(id, d, tx) {
-    await dbOf(tx).execute('UPDATE locations SET nama = ?, lat = ?, lng = ?, radius_m = ? WHERE id = ?', [
+    await dbOf(tx).execute('UPDATE locations SET nama = ?, lat = ?, lng = ?, radius_m = ?, alamat = ? WHERE id = ?', [
       d.nama,
       d.lat,
       d.lng,
       d.radiusM,
+      d.alamat ?? null,
       id,
     ]);
   },

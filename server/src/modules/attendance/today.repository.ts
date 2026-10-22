@@ -18,6 +18,7 @@ interface TodayRow extends RowDataPacket {
   lat: string;
   lng: string;
   radiusM: number;
+  alamat: string | null;
   attendanceId: number | null;
   checkInAt: Date | null;
   checkOutAt: Date | null;
@@ -37,7 +38,7 @@ export const todayRepository: TodayRepository = {
       `SELECT r.id AS rosterId, DATE_FORMAT(r.shift_date, '%Y-%m-%d') AS shiftDate,
               s.nama AS shiftNama, TIME_FORMAT(s.jam_mulai, '%H:%i') AS jamMulai, TIME_FORMAT(s.jam_selesai, '%H:%i') AS jamSelesai,
               s.toleransi_menit AS toleransi,
-              l.id AS locationId, l.nama AS locationNama, l.lat AS lat, l.lng AS lng, l.radius_m AS radiusM,
+              l.id AS locationId, l.nama AS locationNama, l.lat AS lat, l.lng AS lng, l.radius_m AS radiusM, l.alamat AS alamat,
               a.id AS attendanceId, a.check_in_at AS checkInAt, a.check_out_at AS checkOutAt, a.status AS attStatus,
               a.late_minutes AS lateMinutes, a.early_leave_minutes AS earlyLeaveMinutes,
               a.auto_closed AS autoClosed, a.needs_correction AS needsCorrection
@@ -54,7 +55,14 @@ export const todayRepository: TodayRepository = {
         shiftDate: r.shiftDate,
         shiftNama: r.shiftNama,
         shift: { startTime: r.jamMulai, endTime: r.jamSelesai, lateToleranceMinutes: Number(r.toleransi) },
-        location: { id: Number(r.locationId), nama: r.locationNama, lat: Number(r.lat), lng: Number(r.lng), radiusM: Number(r.radiusM) },
+        location: {
+          id: Number(r.locationId),
+          nama: r.locationNama,
+          lat: Number(r.lat),
+          lng: Number(r.lng),
+          radiusM: Number(r.radiusM),
+          alamat: r.alamat ?? null,
+        },
         attendance:
           r.attendanceId === null
             ? null

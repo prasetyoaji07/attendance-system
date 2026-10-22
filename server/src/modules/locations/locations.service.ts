@@ -12,6 +12,8 @@ export interface LocationRecord {
   lat: number;
   lng: number;
   radiusM: number;
+  /** Alamat lokasi kerja (satu teks). Opsional: NULL/kosong = belum diisi. */
+  alamat?: string | null;
 }
 
 export type LocationWrite = Omit<LocationRecord, 'id'>;
@@ -33,6 +35,9 @@ export interface LocationsDeps {
 
 const dupName = (nama: string) => AppError.conflict(`Nama lokasi "${nama}" sudah dipakai. Pakai nama lain ya.`);
 
+/** Alamat kosong (atau hanya spasi) disimpan sebagai null. */
+const cleanAlamat = (v: string | null | undefined): string | null => v?.trim() || null;
+
 export function createLocationsService({ repo, audit, runInTransaction }: LocationsDeps) {
   async function mustFind(id: number): Promise<LocationRecord> {
     const l = await repo.findById(id);
@@ -51,6 +56,7 @@ export function createLocationsService({ repo, audit, runInTransaction }: Locati
         lat: input.lat,
         lng: input.lng,
         radiusM: input.radiusM ?? RULES.defaultRadiusM,
+        ...(input.alamat !== undefined ? { alamat: cleanAlamat(input.alamat) } : {}),
       };
       try {
         const id = await runInTransaction(async (tx) => {
@@ -72,6 +78,8 @@ export function createLocationsService({ repo, audit, runInTransaction }: Locati
         lat: patch.lat ?? existing.lat,
         lng: patch.lng ?? existing.lng,
         radiusM: patch.radiusM ?? existing.radiusM,
+        // Hanya berubah bila alamat memang dikirim; kalau tidak, alamat lama dipertahankan.
+        alamat: patch.alamat !== undefined ? cleanAlamat(patch.alamat) : existing.alamat,
       };
       const { id: _id, ...before } = existing;
       try {

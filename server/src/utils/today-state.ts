@@ -32,6 +32,8 @@ export interface TodayLocation {
   lat: number;
   lng: number;
   radiusM: number;
+  /** Alamat lokasi kerja (satu teks); dicetak di foto selfie. Opsional: kosong/null = belum diisi. */
+  alamat?: string | null;
 }
 
 /** Baris attendance milik sebuah roster (jika ada). `checkInAt` bisa kosong untuk baris seperti ALPA/LIBUR. */
