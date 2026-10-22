@@ -39,19 +39,19 @@ Centang saat selesai. Urutan penting: fase berikutnya bergantung pada fase sebel
 - [x] `ui/Button.tsx`: variant danger/success memakai hex dan `text-[13px]` (lama). Diganti saat tombol dirombak datar: commit 9390144 (tanpa hex, gradien, dan sisi tebal) dan 3c97db3 (hover primary `hover:bg-primary-700`). Lolos typecheck, belum terbukti di browser
 - [x] Audit `npm audit` client (20 Okt 2026): 7 peringatan (2 moderate, 5 high), semuanya dari rantai `tailwindcss` v3 (`braces`, `chokidar`, `micromatch`, `fast-glob`, `postcss-nested`, `postcss-selector-parser`), bukan dari `jsqr` atau `qrcode.react`. Alat build, bukan kode di browser. Satu-satunya perbaikan npm adalah lompat ke Tailwind 4 (breaking, melanggar aturan proyek Tailwind v3), jadi sengaja dibiarkan. Jangan `npm audit fix --force`
 - [x] docs: komponen Alert (termasuk tone sukses) sudah ada di `design.md` 9.12 (selisih tinggi input 44 vs 48 sudah beres: design.md 9.4 kini 44, sesuai `inputCls`). `jobs/daily-close.ts` kini hanya kerangka yang mencetak "dilewati: penutupan harian belum dibuat (Fase 4)", bukan "TODO"; isi job-nya tetap Fase 4 (lihat item `jobs/daily-close.ts`). Tampilan di log server nyata belum diperiksa
-- [ ] Dropdown alasan pulang dan labelnya disalin dari server (`earlyLeave.ts`); kalau server menambah alasan, client harus ikut
+- [x] Dropdown alasan pulang dan labelnya disalin dari server (`earlyLeave.ts`); kalau server menambah alasan, client harus ikut. Dijaga `server/src/tests/early-leave-sync.test.ts` (membandingkan kode, urutan, dan label dengan file client). Terbukti: `npm test` 22 Okt 2026 = 377 lulus + 4 todo, termasuk tes itu
 - [x] Hapus `client/src/pages/Home.tsx` (tidak dipakai) lewat `git rm`
 - [x] `RequireRole`: peran yang tidak berhak diarahkan ke `/beranda` (sebelumnya `/jadwal`)
-- [ ] Keputusan bisnis (belum diputuskan): status absen tetap `TELAT` saat telat lalu pulang awal; apakah status "pulang cepat" perlu tampil juga
+- [x] Keputusan bisnis (diputuskan 22 Okt 2026): status hari itu tetap `TELAT` saat telat lalu pulang awal (prioritas TELAT > PULANG_CEPAT > HADIR di `daily-status.ts`), dan "Pulang cepat" tampil sebagai lencana tambahan di Beranda (sudah ada di kode). Belum terbukti di layar: kedua lencana tampil bersamaan. Sisa: rekap Excel (Fase 4) dan dashboard (Fase 5) harus memuat kolom menit pulang cepat
 - [x] Dua `<select>` bawaan diganti ke `ui/Select`: `LocationQr.tsx` (commit 974a382) dan `Schedule.tsx` (commit cf6df65). Lolos typecheck, belum terbukti di browser (daftar berupa bottom sheet di HP belum dicek; pilihan lokasi hanya tampil bila ada lebih dari satu lokasi)
 - [x] Pesan "Terjadi kesalahan" untuk galat 502 kurang ramah (fallback di `api.ts`). Commit 56b0e88: galat 502/503/504 memakai kode `SERVER_UNAVAILABLE` dan pesan "Server sedang tidak bisa dijangkau...". Lolos typecheck, belum terbukti di browser
 
-### Fase 2b: Absen tanpa QR (selfie) (disetujui secara konsep, SETELAH C2; rincian belum final)
-- [ ] Perbarui `docs/alur.md` bagian 7 dan 8 lebih dulu (jalur tanpa QR: GPS + selfie langsung dari kamera, jam server, status "menunggu tinjauan", flag risiko; tinjauan HRD Sesuai/Mencurigakan tanpa mengubah jam absen; koreksi lewat pengajuan + audit log)
-- [ ] Server: `qr` menjadi opsional di `attendance.schema.ts` dan `presence.ts` (`assertPresence`), tabel/kolom selfie + status tinjauan (migrasi baru), unggah selfie aman
+### Fase 2b: Absen tanpa QR (selfie) (tingkat Standar, untuk demo; rancangan di `docs/alur.md` 7.1b)
+- [x] Perbarui `docs/alur.md` lebih dulu (commit ec3451b, dokumen saja): jalur tanpa QR selalu tersedia sejajar dengan scan QR, selfie langsung dari kamera, jam server, absen langsung sah, flag `NO_QR`, tinjauan HRD berbasis pengecualian (berflag risiko + sampel acak 10%, hasil tidak mengubah jam absen), bagian 2, 5.2, 7.1, 7.1b, aturan 11-14, bagian 9 dan 10
+- [ ] Server: `qr` menjadi opsional di `attendance.schema.ts` dan `presence.ts` (`assertPresence`); migrasi baru: kolom `check_in_method`, `check_out_method`, `review_status` di `attendance` dan tabel `attendance_selfies`; unggah selfie aman; selfie dihapus setelah 30 hari; flag `NO_QR` di `risk_flags`
 - [ ] Client: kamera selfie langsung (tanpa pilih file galeri), alur "absen tanpa QR" di Beranda
-- [ ] Client + server: layar tinjauan HRD; absen yang belum ditinjau diselesaikan/diberi tanda sebelum periode dikunci (usulan, belum final)
-- Catatan: pencocokan wajah otomatis bukan bagian ini (data biometrik, UU PDP). Fake GPS tetap keterbatasan jujur web (dilapisi QR dinamis bila ada, device binding, flag risiko). Fingerprint mesin = sistem terpisah
+- [ ] Client + server: layar tinjauan HRD (antrean berisi absen berflag risiko + sampel acak 10%; hasil Sesuai/Mencurigakan tidak mengubah jam absen); periode tidak bisa dikunci selama masih ada tinjauan `PENDING` (usulan, belum final)
+- Catatan: tingkat Standar dipilih untuk demo. Ide pengetatan (kode sekali pakai sebelum selfie, sinyal IP sebagai flag lemah, tinjauan 100% sebagai pengaturan) belum diputuskan dan tidak dikerjakan. Pencocokan wajah otomatis bukan bagian ini (data biometrik, UU PDP). Fake GPS tetap keterbatasan jujur web (dilapisi QR dinamis bila ada, device binding, flag risiko). Fingerprint mesin = sistem terpisah
 
 ## Fase desain: tampilan putih, hitam, oranye (lintas fase)
 Arah datar-modern (gaya "sisi tebal 3D" lama dihapus): putih untuk latar dan kartu, hitam untuk aksi utama dan menu aktif, oranye hemat. Ringkasan lengkap ada di `docs/design.md`.
@@ -79,7 +79,7 @@ Arah datar-modern (gaya "sisi tebal 3D" lama dihapus): putih untuk latar dan kar
 
 ## Fase 5: Dashboard, Risiko, Integrasi
 - [ ] Dashboard HRD: kehadiran, heatmap telat, tren per divisi (bulanan + tahunan, data dari seed 12 bulan), peringkat paling rajin, lembur vs anggaran
-- [ ] Rule risiko sederhana (koordinat identik berulang, dll) + `risk_flags`
+- [ ] Rule risiko sederhana (koordinat identik berulang, lokasi melompat jauh dalam waktu singkat, dll) + `risk_flags`
 - [ ] Prediksi absensi (WMA, sambungkan dengan pengalaman skripsi)
 - [ ] Integrasi maintenance-system (satu login, mekanik cuti tidak bisa ditugaskan)
 - [ ] Deploy + README (screenshot, penjelasan keterbatasan, label data simulasi)
