@@ -7,13 +7,14 @@ import type { CheckInInput, CheckOutInput } from './attendance.schema';
 import { createAttendanceService } from './attendance.service';
 import { checkOutRepository } from './checkout.repository';
 import { createCheckOutService } from './checkout.service';
+import { selfieStorage } from './selfie-runtime';
 import { todayRepository } from './today.repository';
 import { createTodayService } from './today.service';
 
 const qr = { qrSecret: config.QR_SECRET, qrTtlSeconds: RULES.qrTtlSeconds };
 
-const service = createAttendanceService({ repo: attendanceRepository, ...qr, runInTransaction });
-const checkOutService = createCheckOutService({ repo: checkOutRepository, ...qr, runInTransaction });
+const service = createAttendanceService({ repo: attendanceRepository, ...qr, selfieStorage, runInTransaction });
+const checkOutService = createCheckOutService({ repo: checkOutRepository, ...qr, selfieStorage, runInTransaction });
 const todayService = createTodayService({ repo: todayRepository });
 
 export async function checkIn(req: Request, res: Response) {

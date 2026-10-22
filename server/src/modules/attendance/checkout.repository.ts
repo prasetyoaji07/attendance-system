@@ -3,6 +3,7 @@ import { dbOf } from '../../core/db-helpers';
 import type { OpenAttendanceRow } from '../../utils/auto-close';
 import type { AutoCloseRepository } from './auto-close.service';
 import type { AttendanceRecord, CheckOutRepository } from './checkout.service';
+import { insertSelfie } from './selfie.repository';
 
 // DECIMAL dikembalikan mysql2 sebagai string, jadi lat/lng diubah ke number di sini.
 interface LatestRow extends RowDataPacket {
@@ -57,14 +58,41 @@ export const checkOutRepository: CheckOutRepository = {
   },
 
   async updateCheckOut(d, tx) {
+    const method = d.method ?? 'QR';
+    const addNoQrFlag = method === 'NO_QR' ? 1 : 0;
+    const reviewPending = d.reviewPending ? 1 : 0;
     // Syarat di WHERE membuat UPDATE ini aman dari dua request bersamaan dan dari auto-close yang menyalip.
+    // risk_flags: tambah 'NO_QR' hanya untuk jalur tanpa QR dan hanya jika belum ada.
+    // review_status: hanya naik dari NOT_REQUIRED ke PENDING; status tinjauan lain tidak disentuh.
     const [res] = await dbOf(tx).execute<ResultSetHeader>(
       `UPDATE attendance
-          SET check_out_at = ?, lat_out = ?, lng_out = ?, early_leave_minutes = ?, early_leave_reason = ?, status = ?
+          SET check_out_at = ?, lat_out = ?, lng_out = ?, early_leave_minutes = ?, early_leave_reason = ?, status = ?,
+              check_out_method = ?,
+              risk_flags = CASE
+                WHEN ? = 0 THEN risk_flags
+                WHEN risk_flags IS NULL OR risk_flags = '' THEN 'NO_QR'
+                WHEN FIND_IN_SET('NO_QR', risk_flags) > 0 THEN risk_flags
+                ELSE CONCAT(risk_flags, ',NO_QR')
+              END,
+              review_status = CASE WHEN ? = 1 AND review_status = 'NOT_REQUIRED' THEN 'PENDING' ELSE review_status END
         WHERE id = ? AND check_out_at IS NULL AND auto_closed = 0`,
-      [d.checkOutAt, d.lat, d.lng, d.earlyLeaveMinutes, d.earlyLeaveReason, d.status, d.attendanceId],
+      [
+        d.checkOutAt,
+        d.lat,
+        d.lng,
+        d.earlyLeaveMinutes,
+        d.earlyLeaveReason,
+        d.status,
+        method,
+        addNoQrFlag,
+        reviewPending,
+        d.attendanceId,
+      ],
     );
-    return res.affectedRows === 1;
+    if (res.affectedRows !== 1) return false;
+    // Metadata selfie ikut transaksi yang sama: kalau ini gagal, check-out-nya ikut dibatalkan.
+    if (d.selfie) await insertSelfie(d.attendanceId, 'OUT', d.selfie, tx);
+    return true;
   },
 };
 

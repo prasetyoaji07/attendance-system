@@ -1,6 +1,7 @@
 import type { ResultSetHeader, RowDataPacket } from 'mysql2';
 import { dbOf } from '../../core/db-helpers';
 import type { AttendanceRepository, RosterCandidate } from './attendance.service';
+import { insertSelfie } from './selfie.repository';
 
 // DECIMAL dikembalikan mysql2 sebagai string, jadi lat/lng diubah ke number di sini.
 interface CandidateRow extends RowDataPacket {
@@ -50,10 +51,25 @@ export const attendanceRepository: AttendanceRepository = {
 
   async insertCheckIn(d, tx) {
     const [res] = await dbOf(tx).execute<ResultSetHeader>(
-      `INSERT INTO attendance (roster_id, check_in_at, lat_in, lng_in, distance_m, accuracy_m, late_minutes, status)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      [d.rosterId, d.checkInAt, d.lat, d.lng, d.distanceM, d.accuracyM, d.lateMinutes, d.status],
+      `INSERT INTO attendance (roster_id, check_in_at, lat_in, lng_in, distance_m, accuracy_m, late_minutes, status,
+                               check_in_method, review_status, risk_flags)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        d.rosterId,
+        d.checkInAt,
+        d.lat,
+        d.lng,
+        d.distanceM,
+        d.accuracyM,
+        d.lateMinutes,
+        d.status,
+        d.method ?? 'QR',
+        d.reviewStatus ?? 'NOT_REQUIRED',
+        d.riskFlags ?? null,
+      ],
     );
+    // Metadata selfie ikut transaksi yang sama: kalau ini gagal, absennya ikut dibatalkan.
+    if (d.selfie) await insertSelfie(res.insertId, 'IN', d.selfie, tx);
     return res.insertId;
   },
 };
