@@ -1,6 +1,7 @@
 /**
  * Ambil satu frame dari video kamera lalu kecilkan jadi JPEG (tanpa paket tambahan).
  * Target <= ~200 KB supaya aman di bawah batas server 300.000 byte (RULES.maxSelfieBytes).
+ * Opsional: cetak baris teks (nama, jam, koordinat, lokasi) di pojok bawah foto.
  */
 export interface JpegShot {
   /** Isi JPEG dalam base64 (tanpa awalan "data:"), siap dikirim ke server. */
@@ -31,7 +32,48 @@ function readDataUrl(blob: Blob): Promise<string> {
   });
 }
 
-export async function captureJpeg(video: HTMLVideoElement): Promise<JpegShot> {
+/** Pecah satu baris jadi beberapa baris visual supaya tidak melebihi lebar maksimum. */
+function wrapText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string[] {
+  const words = text.split(' ');
+  const out: string[] = [];
+  let current = '';
+  for (const word of words) {
+    const candidate = current ? `${current} ${word}` : word;
+    if (current && ctx.measureText(candidate).width > maxWidth) {
+      out.push(current);
+      current = word;
+    } else {
+      current = candidate;
+    }
+  }
+  if (current) out.push(current);
+  return out;
+}
+
+/**
+ * Cetak teks di pojok bawah foto dengan latar gelap tipis.
+ * Pengecualian token design.md: canvas tidak bisa memakai kelas Tailwind, jadi warna ditulis langsung
+ * (putih di atas hitam transparan, supaya terbaca di foto terang maupun gelap).
+ */
+function drawOverlay(ctx: CanvasRenderingContext2D, w: number, h: number, lines: string[]) {
+  if (lines.length === 0) return;
+  const fontPx = Math.max(10, Math.round(w / 40));
+  const pad = Math.round(fontPx * 0.6);
+  const lineH = Math.round(fontPx * 1.3);
+  ctx.font = `${fontPx}px sans-serif`;
+  ctx.textBaseline = 'top';
+
+  const wrapped: string[] = [];
+  for (const line of lines) wrapped.push(...wrapText(ctx, line, w - pad * 2));
+
+  const boxH = wrapped.length * lineH + pad * 2;
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
+  ctx.fillRect(0, h - boxH, w, boxH);
+  ctx.fillStyle = '#ffffff';
+  wrapped.forEach((t, i) => ctx.fillText(t, pad, h - boxH + pad + i * lineH));
+}
+
+export async function captureJpeg(video: HTMLVideoElement, overlayLines: string[] = []): Promise<JpegShot> {
   const vw = video.videoWidth;
   const vh = video.videoHeight;
   if (vw === 0 || vh === 0) throw new Error('Kamera belum siap');
@@ -46,6 +88,7 @@ export async function captureJpeg(video: HTMLVideoElement): Promise<JpegShot> {
     canvas.width = Math.max(1, Math.round(vw * base * scale));
     canvas.height = Math.max(1, Math.round(vh * base * scale));
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    drawOverlay(ctx, canvas.width, canvas.height, overlayLines);
     for (const q of QUALITIES) {
       const blob = await toBlob(canvas, q);
       chosen = blob;

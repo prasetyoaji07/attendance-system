@@ -107,6 +107,31 @@ export default function Beranda() {
   const outside = distanceM !== null && roster !== null && distanceM > roster.location.radiusM;
   const weakGps = geo.status === 'ready' && geo.accuracyM > MAX_ACCURACY_M;
 
+  // Dasar perkiraan jam: serverTime saat data dimuat. Waktu yang berlalu sejak itu dihitung dari dataUpdatedAt.
+  const serverMs = new Date(data.serverTime).getTime();
+  const loadedAtMs = today.dataUpdatedAt;
+
+  /**
+   * Baris teks yang dicetak di pojok bawah foto selfie. Dipanggil saat "Ambil foto" ditekan.
+   * Jam = jam server terakhir + waktu yang berlalu sejak data dimuat (bukan jam HP), jadi hasilnya perkiraan.
+   * Data resmi tetap yang dicatat server di database.
+   */
+  function buildSelfieLines(): string[] {
+    const lines: string[] = [];
+    if (user) lines.push(`${user.nama} (${user.nik})`);
+    const estimated = new Date(serverMs + (Date.now() - loadedAtMs)).toISOString();
+    lines.push(`${dateWib(estimated)} ${timeWib(estimated)} WIB`);
+    if (geo.status === 'ready') {
+      lines.push(`Lat ${geo.lat.toFixed(6)}, Lng ${geo.lng.toFixed(6)} (akurasi ${Math.round(geo.accuracyM)} m)`);
+    }
+    if (roster) {
+      lines.push(`Lokasi: ${roster.location.nama}`);
+      const alamat = roster.location.alamat?.trim();
+      if (alamat) lines.push(alamat);
+    }
+    return lines;
+  }
+
   /** Kirim absen lewat jalur QR (qr terisi) atau jalur tanpa QR (selfie terisi). */
   function send(proof: { qr: string } | { selfie: string }) {
     setNotice(null);
@@ -355,6 +380,7 @@ export default function Beranda() {
         title={mode === 'in' ? 'Selfie untuk absen masuk' : 'Selfie untuk absen pulang'}
         onResult={handleSelfie}
         onCancel={() => setSelfieOpen(false)}
+        getOverlayLines={buildSelfieLines}
       />
     </div>
   );

@@ -9,6 +9,8 @@ export interface TodayLocation {
   lat: number;
   lng: number;
   radiusM: number;
+  /** Alamat lokasi kerja (dicetak di foto selfie). Kosong/null bila belum diisi. */
+  alamat?: string | null;
 }
 
 /** Bentuk balasan GET /attendance/today (server/src/utils/today-state.ts). */

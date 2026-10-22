@@ -19,6 +19,8 @@ interface Props {
   /** Dipanggil saat pengguna memilih "Pakai foto ini". Induk yang menutup dialog. */
   onResult: (jpegBase64: string) => void;
   onCancel: () => void;
+  /** Dipanggil tepat saat "Ambil foto" ditekan; hasilnya dicetak di pojok bawah foto (jamnya jadi segar). */
+  getOverlayLines?: () => string[];
 }
 
 /*
@@ -26,7 +28,7 @@ interface Props {
  * Pola dialog sama dengan QrScanner (modal di desktop, bottom sheet di HP).
  * Pengecualian token: warna overlay rgba(11,13,20,0.5) disalin dari ConfirmDialog.
  */
-export function SelfieCamera({ open, title, onResult, onCancel }: Props) {
+export function SelfieCamera({ open, title, onResult, onCancel, getOverlayLines }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [cam, setCam] = useState<CamState>('starting');
   const [phase, setPhase] = useState<Phase>('camera');
@@ -97,7 +99,7 @@ export function SelfieCamera({ open, title, onResult, onCancel }: Props) {
     if (!video || taking) return;
     setTaking(true);
     try {
-      const s = await captureJpeg(video);
+      const s = await captureJpeg(video, getOverlayLines?.() ?? []);
       setShot(s);
       setPhase('preview');
     } catch {
