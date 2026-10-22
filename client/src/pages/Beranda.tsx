@@ -1,4 +1,4 @@
-import { CalendarOff, CircleAlert, Clock, LocateFixed, LogOut, MapPin } from 'lucide-react';
+import { CalendarOff, Camera, CircleAlert, Clock, LocateFixed, LogOut, MapPin } from 'lucide-react';
 import { useState } from 'react';
 import { AttendanceButton, type AttendanceButtonState } from '@/components/AttendanceButton';
 import { Alert } from '@/components/ui/Alert';
@@ -12,6 +12,7 @@ import {
 } from '@/features/attendance/earlyLeave';
 import { dateWib, greetingWib, timeWib } from '@/features/attendance/format';
 import { QrScanner } from '@/features/attendance/QrScanner';
+import { SelfieCamera } from '@/features/attendance/SelfieCamera';
 import { useGeolocation } from '@/features/attendance/useGeolocation';
 import { useSubmitAttendance } from '@/features/attendance/useSubmitAttendance';
 import { useToday } from '@/features/attendance/useToday';
@@ -63,6 +64,7 @@ export default function Beranda() {
   const { geo, refresh } = useGeolocation(needsLocation);
   const [reason, setReason] = useState<EarlyLeaveReason | ''>('');
   const [scanning, setScanning] = useState(false);
+  const [selfieOpen, setSelfieOpen] = useState(false);
   const [notice, setNotice] = useState<Notice | null>(null);
   const submit = useSubmitAttendance();
 
@@ -105,11 +107,11 @@ export default function Beranda() {
   const outside = distanceM !== null && roster !== null && distanceM > roster.location.radiusM;
   const weakGps = geo.status === 'ready' && geo.accuracyM > MAX_ACCURACY_M;
 
-  function handleScan(qr: string) {
-    setScanning(false);
+  /** Kirim absen lewat jalur QR (qr terisi) atau jalur tanpa QR (selfie terisi). */
+  function send(proof: { qr: string } | { selfie: string }) {
     setNotice(null);
     submit.mutate(
-      { mode, qr, earlyLeaveReason: mode === 'out' && reason ? reason : undefined },
+      { mode, ...proof, earlyLeaveReason: mode === 'out' && reason ? reason : undefined },
       {
         onSuccess: (res) =>
           setNotice({
@@ -123,6 +125,16 @@ export default function Beranda() {
         },
       },
     );
+  }
+
+  function handleScan(qr: string) {
+    setScanning(false);
+    send({ qr });
+  }
+
+  function handleSelfie(selfie: string) {
+    setSelfieOpen(false);
+    send({ selfie });
   }
 
   // Tampilan tombol Absen menurut status dari server dan keadaan GPS.
@@ -190,6 +202,23 @@ export default function Beranda() {
       {btn && (
         <section className="flex flex-col items-center gap-3">
           <AttendanceButton state={btn.state} label={btn.label} detail={btn.detail} onClick={btn.onClick} />
+
+          {btn.state === 'ready' && (
+            <div className="flex flex-col items-center gap-1">
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  setNotice(null);
+                  setSelfieOpen(true);
+                }}
+              >
+                <Camera size={18} strokeWidth={1.75} aria-hidden="true" /> Absen tanpa QR
+              </Button>
+              <p className="max-w-md text-center text-caption text-muted">
+                QR tidak bisa discan? Absen pakai selfie. Absenmu tetap sah dan HRD bisa mengecek fotonya.
+              </p>
+            </div>
+          )}
 
           {roster && geo.status === 'ready' && (
             <div className="flex flex-wrap items-center justify-center gap-2">
@@ -319,6 +348,13 @@ export default function Beranda() {
         title={mode === 'in' ? 'Scan QR untuk absen masuk' : 'Scan QR untuk absen pulang'}
         onResult={handleScan}
         onCancel={() => setScanning(false)}
+      />
+
+      <SelfieCamera
+        open={selfieOpen}
+        title={mode === 'in' ? 'Selfie untuk absen masuk' : 'Selfie untuk absen pulang'}
+        onResult={handleSelfie}
+        onCancel={() => setSelfieOpen(false)}
       />
     </div>
   );
