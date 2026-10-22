@@ -35,16 +35,16 @@ Centang saat selesai. Urutan penting: fase berikutnya bergantung pada fase sebel
 
 ### Sisa koreksi Fase 2 (belum dikerjakan)
 - [x] `auth.tsx`: token hanya dihapus bila `GET /auth/me` membalas 401 (sekarang 500 atau jaringan putus ikut melempar ke login). Terbukti di browser: API mati (502) dengan token ada memunculkan layar "Sesimu belum bisa dimuat", token tidak terhapus; setelah API menyala, login lalu Beranda normal. Belum terbukti: klik "Coba lagi" dengan token asli sampai Beranda; token palsu lalu "Coba lagi" mengarah ke login
-- [ ] Schedule: kartu "Libur rotasi" menyesatkan untuk bulan tanpa roster; ganti nilai px dengan token; judul bulan patah di lebar HP
+- [x] Schedule: kartu "Libur rotasi" menyesatkan untuk bulan tanpa roster; ganti nilai px dengan token; judul bulan patah di lebar HP. Commit cf6df65: statistik "–" bila roster kosong, ukuran ke token, judul bulan tidak patah. Lolos typecheck, belum terbukti di browser. Sisa kecil: panel "Detail hari" di bulan tanpa roster masih menulis "Libur sesuai rotasi, tidak ada shift."
 - [x] `ui/Button.tsx`: variant danger/success memakai hex dan `text-[13px]` (lama). Diganti saat tombol dirombak datar: commit 9390144 (tanpa hex, gradien, dan sisi tebal) dan 3c97db3 (hover primary `hover:bg-primary-700`). Lolos typecheck, belum terbukti di browser
 - [x] Audit `npm audit` client (20 Okt 2026): 7 peringatan (2 moderate, 5 high), semuanya dari rantai `tailwindcss` v3 (`braces`, `chokidar`, `micromatch`, `fast-glob`, `postcss-nested`, `postcss-selector-parser`), bukan dari `jsqr` atau `qrcode.react`. Alat build, bukan kode di browser. Satu-satunya perbaikan npm adalah lompat ke Tailwind 4 (breaking, melanggar aturan proyek Tailwind v3), jadi sengaja dibiarkan. Jangan `npm audit fix --force`
-- [ ] docs: bagian A (komponen Alert, termasuk tone sukses) di `design.md` (selisih tinggi input 44 vs 48 sudah beres: design.md 9.4 kini 44, sesuai `inputCls`); log server masih mencetak "[daily-close] TODO" (Fase 4)
+- [x] docs: komponen Alert (termasuk tone sukses) sudah ada di `design.md` 9.12 (selisih tinggi input 44 vs 48 sudah beres: design.md 9.4 kini 44, sesuai `inputCls`). `jobs/daily-close.ts` kini hanya kerangka yang mencetak "dilewati: penutupan harian belum dibuat (Fase 4)", bukan "TODO"; isi job-nya tetap Fase 4 (lihat item `jobs/daily-close.ts`). Tampilan di log server nyata belum diperiksa
 - [ ] Dropdown alasan pulang dan labelnya disalin dari server (`earlyLeave.ts`); kalau server menambah alasan, client harus ikut
 - [x] Hapus `client/src/pages/Home.tsx` (tidak dipakai) lewat `git rm`
 - [x] `RequireRole`: peran yang tidak berhak diarahkan ke `/beranda` (sebelumnya `/jadwal`)
 - [ ] Keputusan bisnis (belum diputuskan): status absen tetap `TELAT` saat telat lalu pulang awal; apakah status "pulang cepat" perlu tampil juga
-- [ ] Dua `<select>` bawaan belum memakai `ui/Select`: `LocationQr.tsx` baris 79 dan `Schedule.tsx` baris 143. Yang Schedule digabung dengan koreksi Schedule di atas; LocationQr bisa langkah sendiri
-- [ ] Pesan "Terjadi kesalahan" untuk galat 502 kurang ramah (fallback di `api.ts`)
+- [x] Dua `<select>` bawaan diganti ke `ui/Select`: `LocationQr.tsx` (commit 974a382) dan `Schedule.tsx` (commit cf6df65). Lolos typecheck, belum terbukti di browser (daftar berupa bottom sheet di HP belum dicek; pilihan lokasi hanya tampil bila ada lebih dari satu lokasi)
+- [x] Pesan "Terjadi kesalahan" untuk galat 502 kurang ramah (fallback di `api.ts`). Commit 56b0e88: galat 502/503/504 memakai kode `SERVER_UNAVAILABLE` dan pesan "Server sedang tidak bisa dijangkau...". Lolos typecheck, belum terbukti di browser
 
 ### Fase 2b: Absen tanpa QR (selfie) (disetujui secara konsep, SETELAH C2; rincian belum final)
 - [ ] Perbarui `docs/alur.md` bagian 7 dan 8 lebih dulu (jalur tanpa QR: GPS + selfie langsung dari kamera, jam server, status "menunggu tinjauan", flag risiko; tinjauan HRD Sesuai/Mencurigakan tanpa mengubah jam absen; koreksi lewat pengajuan + audit log)
