@@ -38,7 +38,7 @@ export function AttendanceButton({ state, label, detail, disabled = false, onCli
       {pulse && (
         <span
           aria-hidden="true"
-          className="absolute inset-0 rounded-full bg-primary-500 opacity-30 motion-safe:animate-ping"
+          className="pointer-events-none absolute inset-0 rounded-full bg-primary-500 opacity-30 motion-safe:animate-ping"
         />
       )}
       <button
