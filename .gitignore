@@ -14,3 +14,6 @@ CLAUDE.md
 setup.bat
 setup.sh
 .vscode/
+
+# Selfie absen tanpa QR (data pribadi, jangan masuk git)
+uploads/
