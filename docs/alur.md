@@ -121,14 +121,18 @@ attendance-system/
 | Tabel | Kolom penting |
 |---|---|
 | `rosters` | id, employee_id, **shift_date**, shift_id, location_id. **UNIQUE(employee_id, shift_date)** |
-| `attendance` | id, roster_id (UNIQUE), check_in_at, check_out_at, lat_in, lng_in, lat_out, lng_out, distance_m, accuracy_m, late_minutes, status, **check_in_method**, **check_out_method** (`QR` / `NO_QR`), **review_status** (`NOT_REQUIRED` / `PENDING` / `SESUAI` / `MENCURIGAKAN`) |
-| `attendance_selfies` | id, attendance_id, jenis (`IN` / `OUT`), file_ref, captured_at, expires_at. Gambar tidak disimpan di tabel; tempat penyimpanannya diputuskan saat implementasi |
+| `attendance` | id, roster_id (UNIQUE), check_in_at, check_out_at, lat_in, lng_in, lat_out, lng_out, distance_m, accuracy_m, late_minutes, status, **check_in_method**, **check_out_method** (`QR` / `NO_QR`), **review_status** (`NOT_REQUIRED` / `PENDING` / `SESUAI` / `MENCURIGAKAN`), **risk_flags** (teks kode dipisah koma, mis. `NO_QR`; kolom di `attendance`, bukan tabel), **reviewed_by** (users.id peninjau, tanpa FK), **reviewed_at** |
+| `attendance_selfies` | id, attendance_id (FK ke `attendance`), jenis (`IN` / `OUT`), file_ref, captured_at, expires_at. **UNIQUE(attendance_id, jenis)**. Gambar tidak disimpan di tabel, melainkan di disk server (lihat catatan di bawah tabel) |
 | `devices` | id, user_id, device_id, status (`active` / `pending`) |
 | `requests` | id, type, employee_id, payload (JSON), status, current_step |
 | `request_approvals` | id, request_id, step, approver_id, keputusan, catatan, waktu |
 | `leave_balances` | id, employee_id, tahun, kuota, terpakai |
 | `overtime_records` | id, request_id, jam_disetujui, jam_aktual, jam_dibayar, pengali |
 | `attendance_corrections` | id, attendance_id, nilai_lama, nilai_baru, alasan, status |
+
+**Catatan absen tanpa QR (migrasi 005-011, satu perubahan per file):** 005 `check_in_method` VARCHAR(10) NOT NULL DEFAULT `'QR'`; 006 `check_out_method` VARCHAR(10) NULL; 007 `review_status` VARCHAR(15) NOT NULL DEFAULT `'NOT_REQUIRED'`; 008 `risk_flags` VARCHAR(100) NULL; 009 `reviewed_by` BIGINT UNSIGNED NULL; 010 `reviewed_at` DATETIME NULL; 011 tabel `attendance_selfies`. Struktur ini sudah terbukti ada di TiDB (22 Okt 2026, `server/scripts/try-schema.ts`).
+
+**Penyimpanan selfie:** file JPEG disimpan di disk server, folder `uploads/selfies` di folder tempat server dijalankan (dari `server/`: `server/uploads/selfies`; folder `uploads/` ada di `.gitignore`). Nama file = UUID acak + `.jpg` (tanpa NIK atau tanggal) dan itulah isi `file_ref`. Akses lewat antarmuka `SelfieStorage`, jadi bisa diganti object storage tanpa mengubah logika absen. Selfie dikirim klien sebagai base64 JPEG di dalam JSON (maksimal 300.000 byte setelah decode). Selfie yang lewat masa simpan (30 hari) dihapus oleh `server/scripts/purge-selfies.ts`.
 
 **Catatan roster:** `"libur"` di `shift_patterns.urutan` adalah nama khusus (tidak peka huruf besar/kecil) dan **tidak membuat baris** di `rosters`. Nama lain dicocokkan ke `shifts.nama` (juga tidak peka huruf besar/kecil). Generate roster membatalkan seluruh proses bila ada jeda antar shift < 11 jam (aturan bisnis 4).
 
